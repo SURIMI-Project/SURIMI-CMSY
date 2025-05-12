@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package surimi.v1;
+
+import "surimi/v1/biomass.proto";
+
+option csharp_namespace = "Grpc.Surimi";
+option java_package = "eu.project.surimi";
+
+message GetBiomassRequest {
+  string simulation_id = 1;
+}
+message GetBiomassResponse {
+  string measurement_unit = 1; // https://ucum.org/ucum
+  repeated BiomassGrid biomass_grids = 2;
+}
+
+service EcologyService {
+  rpc GetBiomass(GetBiomassRequest) returns (GetBiomassResponse);
+}

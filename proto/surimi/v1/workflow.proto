@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package surimi.v1;
+
+import "google/protobuf/timestamp.proto";
+import "surimi/v1/biomass.proto";
+import "surimi/v1/species_price.proto";
+
+option csharp_namespace = "Grpc.Surimi";
+option java_package = "eu.project.surimi";
+
+message InitRequest {
+  string simulation_id = 1;
+  string scenario_id = 2; // model configuration (Area, fleet, species, etc.)
+  // string user_id = 2;	// user id will come from authentication
+  google.protobuf.Timestamp start_date_time = 3; // start date and time of the simulation
+  string step_size = 4; // time step size (e.g . 1 day, 1 month, 1 year) in ISO 8601 duration format
+  // repeated string relevant_species = 4;	// list of species that are relevant for the simulation
+}
+
+message InitResponse {}
+
+message UpdatePricesRequest {
+  string simulation_id = 1;
+  repeated SpeciesPrice prices = 2;
+}
+message UpdatePricesResponse {}
+
+message SimulateStepRequest {
+  string simulation_id = 1;
+}
+
+message SimulateStepResponse {}
+
+message UpdateBiomassRequest {
+  string simulation_id = 1;
+  string measurement_unit = 2; // https://ucum.org/ucum
+  repeated BiomassGrid biomass_grids = 3;
+}
+
+message UpdateBiomassResponse {}
+
+// The workflow service definition. All models should implement this interface
+service WorkflowService {
+  rpc Init(InitRequest) returns (InitResponse);
+  rpc UpdatePrices(UpdatePricesRequest) returns (UpdatePricesResponse);
+  rpc SimulateStep(SimulateStepRequest) returns (SimulateStepResponse);
+  rpc UpdateBiomass(UpdateBiomassRequest) returns (UpdateBiomassResponse);
+}

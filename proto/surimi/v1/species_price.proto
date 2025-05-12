@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package surimi.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "Grpc.Surimi";
+option java_package = "eu.project.surimi";
+
+message SpeciesPrice {
+  string species_id = 1; // 3-alpha code of https://www.fao.org/fishery/en/collection/asfis
+  string port_id = 2; // 2 letter country code (ISO 3166-1 alpha-2) plus 3 letter port code according to https://unece.org/trade/cefact/unlocode-code-list-country-and-territory
+  double price = 3;
+  string measurement_unit = 4; // https://ucum.org/ucum
+  string currency = 5; // 3 letter Currency Code as described in ISO 4217 . GBP, EUR, USD
+  google.protobuf.Timestamp timestamp = 6;
+}

@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package surimi.v1;
+
+option csharp_namespace = "Grpc.Surimi";
+option java_package = "eu.project.surimi";
+
+message SalesSummary {
+  string market_id = 1;
+  string measurement_unit = 2;
+  string currency = 3;
+  repeated Sale sales = 4;
+}
+
+message Sale {
+  string species_id = 1;
+  double quantity = 2;
+  double value = 3;
+}
