@@ -4,7 +4,8 @@ from concurrent import futures
 import grpc
 from server.ExceptionMetadataInterceptor import ExceptionMetadataInterceptor
 from server.workflow_service import WorkflowService
-from surimi.v1 import workflow_pb2_grpc
+from server.stock_assessment_service import StockAssessmentService
+from surimi.v1 import workflow_pb2_grpc, stock_assessment_pb2_grpc
 
 def serve():
 
@@ -22,6 +23,9 @@ def serve():
     
     workflow_service = WorkflowService(tracer, simulation_dictionary)  # Instantiate the workflow service
     workflow_pb2_grpc.add_WorkflowServiceServicer_to_server(workflow_service, server)
+
+    stock_assessment_service = StockAssessmentService(tracer, simulation_dictionary)  # Instantiate the stock_assessment service
+    stock_assessment_pb2_grpc.add_StockAssessmentServiceServicer_to_server(stock_assessment_service, server)
 
     # Bind the server to a port
     server.add_insecure_port("[::]:50201")
