@@ -12,5 +12,5 @@ class StockAssessmentService(stock_assessment_pb2_grpc.StockAssessmentServiceSer
 
         print(f"Create Stock Assessment for simulation {request.simulation_id} ")
 
-        return stock_assessment_pb2.InitResponse()
+        return stock_assessment_pb2.CreateStockAssessmentResponse()
 
