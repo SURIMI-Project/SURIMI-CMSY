@@ -1,0 +1,143 @@
+\documentclass[12pt,a4paper]{article}\usepackage[]{graphicx}\usepackage[]{xcolor}
+% maxwidth is the original width if it is less than linewidth
+% otherwise use linewidth (to make sure the graphics do not exceed the margin)
+\makeatletter
+\def\maxwidth{ %
+  \ifdim\Gin@nat@width>\linewidth
+    \linewidth
+  \else
+    \Gin@nat@width
+  \fi
+}
+\makeatother
+
+\definecolor{fgcolor}{rgb}{0.345, 0.345, 0.345}
+\newcommand{\hlnum}[1]{\textcolor[rgb]{0.686,0.059,0.569}{#1}}%
+\newcommand{\hlsng}[1]{\textcolor[rgb]{0.192,0.494,0.8}{#1}}%
+\newcommand{\hlcom}[1]{\textcolor[rgb]{0.678,0.584,0.686}{\textit{#1}}}%
+\newcommand{\hlopt}[1]{\textcolor[rgb]{0,0,0}{#1}}%
+\newcommand{\hldef}[1]{\textcolor[rgb]{0.345,0.345,0.345}{#1}}%
+\newcommand{\hlkwa}[1]{\textcolor[rgb]{0.161,0.373,0.58}{\textbf{#1}}}%
+\newcommand{\hlkwb}[1]{\textcolor[rgb]{0.69,0.353,0.396}{#1}}%
+\newcommand{\hlkwc}[1]{\textcolor[rgb]{0.333,0.667,0.333}{#1}}%
+\newcommand{\hlkwd}[1]{\textcolor[rgb]{0.737,0.353,0.396}{\textbf{#1}}}%
+\let\hlipl\hlkwb
+
+\usepackage{framed}
+\makeatletter
+\newenvironment{kframe}{%
+ \def\at@end@of@kframe{}%
+ \ifinner\ifhmode%
+  \def\at@end@of@kframe{\end{minipage}}%
+  \begin{minipage}{\columnwidth}%
+ \fi\fi%
+ \def\FrameCommand##1{\hskip\@totalleftmargin \hskip-\fboxsep
+ \colorbox{shadecolor}{##1}\hskip-\fboxsep
+     % There is no \\@totalrightmargin, so:
+     \hskip-\linewidth \hskip-\@totalleftmargin \hskip\columnwidth}%
+ \MakeFramed {\advance\hsize-\width
+   \@totalleftmargin\z@ \linewidth\hsize
+   \@setminipage}}%
+ {\par\unskip\endMakeFramed%
+ \at@end@of@kframe}
+\makeatother
+
+\definecolor{shadecolor}{rgb}{.97, .97, .97}
+\definecolor{messagecolor}{rgb}{0, 0, 0}
+\definecolor{warningcolor}{rgb}{1, 0, 1}
+\definecolor{errorcolor}{rgb}{1, 0, 0}
+\newenvironment{knitrout}{}{} % an empty environment to be redefined in TeX
+
+\usepackage{alltt}
+    \setlength\parindent{0pt}
+    \usepackage{geometry}
+    \usepackage{graphicx}
+    \usepackage{grffile}
+    \geometry{margin=0.5in}
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\begin{document}
+
+    \section*{Acadian redfish}
+
+
+    Species: \emph{Sebastes fasciatus}, Stock code: Acadian redfish - Gulf of Maine - Georges Bank
+
+Region: Northeast Shelf
+
+Marine Ecoregion: Gulf of Maine - Georges Bank
+
+Reconstructed catch data used from years 1950 - 1995 
+
+ For figure captions and method see http://www.seaaroundus.org/cmsy-method
+
+    \begin{figure}[ht]
+    \centering
+    \includegraphics[width=1.00\textwidth ext=.jpg type=jpg]{Acadian redfish - Gulf of Maine - Georges Bank_MAN.jpg}
+    \end{figure}
+
+    \textbf{Results for management (based on BSM analysis)}\\
+
+Fmsy = 0.0362, 95\% CL = 0.0228 - 0.0558 (if B $>$ 1/2 Bmsy then Fmsy = 0.5 r)
+
+Fmsy = 0.0047, 95\% CL = 0.00295 - 0.00723 (r and Fmsy are linearly reduced if B $<$ 1/2 Bmsy)
+
+MSY = 16.4,  95\% CL = 12 - 22.2; Bmsy = 447,  95\% CL = 316 - 692 (1000 tonnes)
+
+Biomass in last year = 29.2, 95\% CL = 20.3 - 45.7 (1000 tonnes)
+
+B/Bmsy in last year = 0.0648, 95\% CL = 0.0475 - 0.0903
+
+Fishing mortality in last year = 0.0219, 95\% CL =0.0128 - 0.0348
+
+F/Fmsy  = 4.66, 95\% CL = 2.09 - 9.35 
+
+ Comment: NOAA Assessment model ASAP 
+
+    \pagebreak
+
+    \begin{figure}[ht]
+    \centering
+    \includegraphics[width=1.00\textwidth ext=.jpg type=jpg]{Acadian redfish - Gulf of Maine - Georges Bank_AN.jpg}
+    \end{figure}
+
+    \textbf{Results of CMSY analysis conducted in JAGS}\\
+
+r = 0.0811, 95\% CL = 0.0467 - 0.113; k = 859, 95\% CL = 629 - 1397 (1000 tonnes)
+
+MSY = 17.4, 95\% CL = 12.5 - 23.4 (1000 tonnes/year)
+
+Relative biomass last year = 0.107 k, 95\% CL = 0.0555 - 0.208
+
+Exploitation F/(r/2) in last year = 0.474 \\
+
+\textbf{Results from Bayesian Schaefer model using catch and CPUE}\\
+
+r = 0.0724, 95\% CL = 0.0456 - 0.112; k = 893, 95\% CL = 633 - 1384
+
+r-k log correlation = -0.741
+
+MSY = 16.4, 95\% CL = 12 - 22.2 (1000 tonnes/year)
+
+Relative biomass in last year = 0.107 k, 95\% CL = 0.0555 - 0.208
+
+Exploitation F/(r/2) in last year = 0.186
+
+q = 0.0667, 95\% CL = 0.047 - 0.0868
+
+Prior range of q = 0.0117 - 0.645
+
+Relative abundance data type = CPUE
+
+Prior initial relative biomass = 0.3 - 0.4 expert
+
+Prior intermediate relative biomass = 0.0207 - 0.223 in year 1989 default
+
+Prior final relative biomass = 0.0169 - 0.215, default
+
+Prior range for r = 0.05 - 0.5 default, prior range for k = 126 - 1729 (1000 tonnes) default
+
+Source for relative biomass: 
+
+NOAA Fisheries. (2020). Assessment Summary Data. Retrieved from www.st.nmfs.noaa.gov/stocksmart. 12/13/2020
+
+    \end{document}

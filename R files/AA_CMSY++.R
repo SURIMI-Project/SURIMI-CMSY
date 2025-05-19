@@ -23,7 +23,7 @@
 options(repos = c(CRAN = "https://cloud.r-project.org"))
 
 # Automatic installation of missing packages
-list.of.packages <- c("R2jags","coda","parallel","foreach","doParallel","gplots","mvtnorm","snpar","neuralnet","conicfit")
+list.of.packages <- c("R2jags","coda","parallel","foreach","doParallel","gplots","mvtnorm","snpar","neuralnet","conicfit","promises")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 library(R2jags)  # Interface with JAGS
@@ -65,7 +65,7 @@ outfile     <- paste("Out_South_Med_",format(Sys.Date(),format="%B%d%Y_"),id_fil
 #----------------------------------------
 # Select stock to be analyzed ----
 #----------------------------------------
-stocks      <-NA
+stocks      <- NA
 # If the input files contain more than one stock, specify below the stock to be analyzed
 # If the line below is commented out (#), all stocks in the input file will be analyzed
 # stocks <- "Hogfish - Florida Keys / East Florida"  #"Blacknose shark - Atlantic"  #"Acadian redfish - Gulf of Maine / Georges Bank"# "Splitnose rockfish - Pacific Coast"  #"Acadian_redfish"  # "ple.27.7d" #"cod.27.1-2coast"#"cod.27.7e-k" # "Acadian redfish - Gulf of Maine / Georges Bank"  #c("Greenspotted rockfish - Pacific Coast")

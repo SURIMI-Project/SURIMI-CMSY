@@ -9,7 +9,7 @@ os.environ["R_HOME"] = rpy2.situation.get_r_home()
 print(f"R_HOME is set to: {os.environ['R_HOME']}")
 
 def run_r_script(stocks="NA"):
-    # 2. Locate the .R driver (no change here)
+        # 2. Locate the .R driver (no change here)
     this_dir = os.path.dirname(os.path.abspath(__file__))
     
     # 3. Construct the path to the R script inside the "R files" folder (correcting this part)
