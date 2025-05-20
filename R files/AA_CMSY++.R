@@ -57,18 +57,16 @@ id_file     <- "id_file.csv" #"Stocks_ID_forDeng_RSb - Copy.csv" # "CombStocks_I
 nn_file     <-  "ffnn.bin" # file containing neural networks trained to estimate B/k priors
 outfile     <- paste("Out_South_Med_",format(Sys.Date(),format="%B%d%Y_"),id_file,sep="") # default name for output file
 
-#----------------------------------------
-# Select stock to be analyzed ----
-#----------------------------------------
-# Select stock to be analyzed ----
 
 #----------------------------------------
 # Select stock to be analyzed ----
 #----------------------------------------
-stocks      <- NA
+#stocks      <- NA
 # If the input files contain more than one stock, specify below the stock to be analyzed
 # If the line below is commented out (#), all stocks in the input file will be analyzed
-# stocks <- "Hogfish - Florida Keys / East Florida"  #"Blacknose shark - Atlantic"  #"Acadian redfish - Gulf of Maine / Georges Bank"# "Splitnose rockfish - Pacific Coast"  #"Acadian_redfish"  # "ple.27.7d" #"cod.27.1-2coast"#"cod.27.7e-k" # "Acadian redfish - Gulf of Maine / Georges Bank"  #c("Greenspotted rockfish - Pacific Coast")
+stocks <- "Hogfish - Florida Keys / East Florida"  
+
+#"Blacknose shark - Atlantic"  #"Acadian redfish - Gulf of Maine / Georges Bank"# "Splitnose rockfish - Pacific Coast"  #"Acadian_redfish"  # "ple.27.7d" #"cod.27.1-2coast"#"cod.27.7e-k" # "Acadian redfish - Gulf of Maine / Georges Bank"  #c("Greenspotted rockfish - Pacific Coast")
 #-----------------------------------------
 # General settings for the analysis ----
 #-----------------------------------------
@@ -405,10 +403,6 @@ cdat<- read.csv(catch_file, header=T, dec=".", stringsAsFactors = FALSE)
 cinfo        <- read.csv(id_file, header=T, dec=".", stringsAsFactors = FALSE)
 load(file = nn_file) # load neural network file
 cat("Files", catch_file, ",", id_file,",",nn_file,"read successfully","\n")
-
-
-
-
 
 
 
@@ -885,18 +879,32 @@ for(stock in stocks) {
   #Plot data and progress -----
   #-----------------------------------------------------------------
   # check for operating system, open separate window for graphs if Windows
-  if(grepl("win",tolower(Sys.info()['sysname']))) {windows(14,9)}
-  par(mfrow=c(2,3),mar=c(5.1,4.5,4.1,2.1))
+#  if(grepl("win",tolower(Sys.info()['sysname']))) {windows(14,9)}
+#  par(mfrow=c(2,3),mar=c(5.1,4.5,4.1,2.1))
+
   # (a): plot catch ----
-  plot(x=yr, y=ct.raw,
-       ylim=c(0,max(ifelse(substr(id_file,1,3)=="Sim",
-                           1.1*true.MSY,0),1.2*max(ct.raw))),
-       type ="l", bty="l", main=paste("A:",gsub(":","",gsub("/","-",stock))), xlab="", ylab="Catch (1000 tonnes/year)", lwd=2, cex.main = 1.5, cex.lab = 1.55, cex.axis = 1.5)
-  lines(x=yr,y=ct,col="blue", lwd=1)
-  points(x=yr[max.yr.i], y=max.ct, col="red", lwd=2)
-  points(x=yr[min.yr.i], y=min.ct, col="red", lwd=2)
-  lines(x=yr,y=rep(MSY.pr,length(yr)),lty="dotted",col="purple")
-  if(substr(id_file,1,3)=="Sim") lines(x=yr,y=rep(true.MSY,length(yr)),lty="dashed",col="green")
+# Create JPEG file (off-screen)
+
+filename_silent <- paste(gsub(":","",gsub("/","-",stock)),"_AN.jpg",sep="")
+jpeg(filename = filename_silent,
+     width = 1024, height = 768, units = "px", res = 120, quality = 95)
+
+# Plot without opening a window
+par(mfrow=c(2,3), mar=c(5.1,4.5,4.1,2.1))
+plot(x=yr, y=ct.raw,
+     ylim=c(0,max(ifelse(substr(id_file,1,3)=="Sim",
+                         1.1*true.MSY,0),1.2*max(ct.raw))),
+     type ="l", bty="l", main=paste("A:",gsub(":","",gsub("/","-",stock))),
+     xlab="", ylab="Catch (1000 tonnes/year)",
+     lwd=2, cex.main = 1.5, cex.lab = 1.55, cex.axis = 1.5)
+lines(x=yr, y=ct, col="blue", lwd=1)
+points(x=yr[max.yr.i], y=max.ct, col="red", lwd=2)
+points(x=yr[min.yr.i], y=min.ct, col="red", lwd=2)
+lines(x=yr, y=rep(MSY.pr, length(yr)), lty="dotted", col="purple")
+if(substr(id_file,1,3)=="Sim") lines(x=yr, y=rep(true.MSY, length(yr)), lty="dashed", col="green")
+
+# Close device
+#dev.off()
 
   # (b): plot r-k graph
   plot(x=ri1, y=ki1, xlim = c(0.95*quantile(ri1,0.001),1.2*quantile(ri1,0.999)),
@@ -1404,20 +1412,26 @@ for(stock in stocks) {
   }
   if(substr(id_file,1,3)=="Sim") points(x=true.Bk,y=ct[nyr]/true.MSY,col="green", cex=3, lwd=2)
   #analysis.plot <- recordPlot()
+# Close device silent1
+dev.off()
 
   #save analytic chart to JPEG file
   if (save.plots==TRUE) {
     jpgfile<-paste(gsub(":","",gsub("/","-",stock)),"_AN.jpg",sep="")
-	if (retrosp.step>0) jpgfile<-gsub(".jpg", paste0("_retrostep_",retrosp.step,".jpg"), jpgfile) #modification added to save all steps in retrospective analysis
-	   dev.copy(jpeg,jpgfile,
-             width = 1024,
-             height = 768,
-             units = "px",
-             pointsize = 18,
-             quality = 95,
-             res=80,
-             antialias="default")
-    dev.off()
+
+
+
+	
+#if (retrosp.step>0) jpgfile<-gsub(".jpg", paste0("_retrostep_",retrosp.step,".jpg"), jpgfile) #modification added to save all steps in retrospective analysis
+#	   dev.copy(jpeg,jpgfile,
+#             width = 1024,
+#             height = 768,
+#             units = "px",
+#             pointsize = 18,
+#             quality = 95,
+#             res=80,
+#             antialias="default")
+#    dev.off()
   }
 
   #---------------------------------------------
@@ -1425,7 +1439,14 @@ for(stock in stocks) {
   #---------------------------------------------
   if(mgraphs==T) {
     # open window for plot of four panels
-    if(grepl("win",tolower(Sys.info()['sysname']))) {windows(14,12)}
+  #  if(grepl("win",tolower(Sys.info()['sysname']))) {windows(14,12)}
+
+####################################################################################################################
+filename_silent2 <- paste(gsub(":","",gsub("/","-",stock)),"_MAN.jpg",sep="")
+jpeg(filename = filename_silent2,
+     width = 1024, height = 768, units = "px", res = 80,pointsize = 18, quality = 95)
+
+
     par(mfrow=c(2,2))
     # make margins narrower
     par(mar=c(3.1,4.2,2.1,2.1))
@@ -1510,32 +1531,47 @@ for(stock in stocks) {
            lty=c(1,1,1,-1,-1,-1),pch=c(22,21,24,22,22,22),pt.bg=c(rep("white",3),"cornsilk2","grey","cornsilk4"),
            col=1,lwd=.8,cex=0.85,pt.cex=c(rep(1.1,3),1.5,1.5,1.5),bty="n",y.intersp = 1.1)
     #End of Biplot
-
+# end of jpeg silent2
+ dev.off()
   } # end of management graphs
 
   #management.plot <- recordPlot()
 
   # save management chart to JPEG file
-  if (save.plots==TRUE & mgraphs==TRUE)  {
-    jpgfile<-paste(gsub(":","",gsub("/","-",stock)),"_MAN.jpg",sep="")
-	  if (retrosp.step>0) jpgfile<-gsub(".jpg", paste0("_retrostep_",retrosp.step,".jpg"), jpgfile) #modification added to save all steps in retrospective analysis
-    dev.copy(jpeg,jpgfile,
-             width = 1024,
-             height = 768,
-             units = "px",
-             pointsize = 18,
-             quality = 95,
-             res=80,
-             antialias="default")
-    dev.off()
-  }
+#  if (save.plots==TRUE & mgraphs==TRUE)  {
+#    jpgfile<-paste(gsub(":","",gsub("/","-",stock)),"_MAN.jpg",sep="")
+#	  if (retrosp.step>0) jpgfile<-gsub(".jpg", paste0("_retrostep_",retrosp.step,".jpg"), jpgfile) #modification added to save all steps in retrospective analysis
+#    dev.copy(jpeg,jpgfile,
+#             width = 1024,
+#             height = 768,
+#             units = "px",
+#             pointsize = 18,
+#             quality = 95,
+#             res=80,
+#             antialias="default")
+#    dev.off()
+#  }
+
+
 
   #---------------------------------------------------------
   #><>MSY: rk.diags plot
   #--------------------------------------------------------
   if(rk.diags==T) {
     # open window for plot of four panels
-    if(grepl("win",tolower(Sys.info()['sysname']))) {windows(9,9)}
+  #  if(grepl("win",tolower(Sys.info()['sysname']))) {windows(9,9)}
+############################# rk diags
+   jpgfile<-paste(gsub(":","",gsub("/","-",stock)),"_rk_Diags.jpg",sep="")
+if (retrosp.step>0) jpgfile<-gsub(".jpg", paste0("_retrostep_",retrosp.step,".jpg"), jpgfile) #modification added to save all steps in retrospective analysis
+      jpeg(filename=jpgfile,
+               width = 768,
+               height = 768,
+               units = "px",
+               pointsize = 18,
+               quality = 95,
+               res=80,
+               antialias="default")
+
     # make margins narrower
     par(mfrow=c(1,1),mar=c(4.5,4.5,2,0.5))
     plot(x=ri1, y=ki1, xlim = c(0.95*quantile(ri1,0.001),1.2*quantile(ri1,0.999)),
@@ -1551,26 +1587,28 @@ for(stock in stocks) {
     legend("topright",c("Logistic r-k","Empirical r-k","JAGS r-k","Posterior r-k"),pt.cex = 1.2,pch=15,
            col=c(rgb(0,0,1,0.7),rgb(1,0,1,0.7),rgb(1,0,0,0.7),rgb(0,1,0,1)),bty="n")
 
-    if (save.plots==TRUE) {
-      jpgfile<-paste(gsub(":","",gsub("/","-",stock)),"_rk_Diags.jpg",sep="")
-      if (retrosp.step>0) jpgfile<-gsub(".jpg", paste0("_retrostep_",retrosp.step,".jpg"), jpgfile) #modification added to save all steps in retrospective analysis
-      dev.copy(jpeg,jpgfile,
-               width = 768,
-               height = 768,
-               units = "px",
-               pointsize = 18,
-               quality = 95,
-               res=80,
-               antialias="default")
-      dev.off()
-    }
-  }
+#    if (save.plots==TRUE) {
+#     jpgfile<-paste(gsub(":","",gsub("/","-",stock)),"_rk_Diags.jpg",sep="")
+#      if (retrosp.step>0) jpgfile<-gsub(".jpg", paste0("_retrostep_",retrosp.step,".jpg"), jpgfile) #modification added to save all steps in retrospective analysis
+#      dev.copy(jpeg,jpgfile,
+#               width = 768,
+#               height = 768,
+#               units = "px",
+#               pointsize = 18,
+#               quality = 95,
+#               res=80,
+#               antialias="default")
+#      dev.off()
+#    }
+ dev.off()
+  
+}
   #----------------------------------------------------------
   #><> Optional prior - posterior plots
   #---------------------------------------------------------
   if(pp.plot==T) {
     # open window for plot of four panels
-    if(grepl("win",tolower(Sys.info()['sysname']))) {windows(17,12)}
+  #  if(grepl("win",tolower(Sys.info()['sysname']))) {windows(17,12)}
     # make margins narrower
     par(mfrow=c(2,3),mar=c(4.5,4.5,2,0.5))
     greycol = c(grey(0.7,0.5),grey(0.3,0.5)) # changed 0.6 to 0.7
@@ -1712,7 +1750,7 @@ for(stock in stocks) {
     # plot PP diagnostics for BSM if available
     if(FullSchaefer==T & force.cmsy==F){ # BSM PLOT
     # open window for plot of four panels
-    if(grepl("win",tolower(Sys.info()['sysname']))) {windows(17,12)}
+ #   if(grepl("win",tolower(Sys.info()['sysname']))) {windows(17,12)}
     # make margins narrower
     par(mfrow=c(2,3),mar=c(4.5,4.5,2,0.5))
     greycol = c(grey(0.7,0.5),grey(0.3,0.5))
@@ -1865,7 +1903,7 @@ for(stock in stocks) {
   if(BSMfits.plot==T & FullSchaefer==T & force.cmsy==F){
     #---------------------------------------------
     # open window for plot of four panels
-    if(grepl("win",tolower(Sys.info()['sysname']))) {windows(9,6)}
+  #  if(grepl("win",tolower(Sys.info()['sysname']))) {windows(9,6)}
     # make margins narrower
     par(mfrow=c(2,2),mar=c(3.1,4.1,2.1,2.1),cex=1)
     cord.x <- c(yr,rev(yr))
@@ -1961,84 +1999,88 @@ for(stock in stocks) {
   # HW Produce optional kobe plot
   #-------------------------------------
 
-  if(kobe.plot==T){
-    # open window for plot of four panels
-    if(grepl("win",tolower(Sys.info()['sysname']))) {windows(7,7)}
-    par(mfrow=c(1,1))
-    # make margins narrower
-    par(mar=c(5.1,5.1,2.1,2.1))
+ #-------------------------------------
+# HW Produce optional kobe plot
+#-------------------------------------
+if (kobe.plot == TRUE) {
 
-    if(FullSchaefer==T & force.cmsy==F) {
-      x.F_Fmsy = all.FFmsy.bsm[,nyr]
-      y.b_bmsy = all.BBmsy.bsm[,nyr]} else { # use CMSY data
-        x.F_Fmsy = all.FFmsy.cmsy[,nyr]
-        y.b_bmsy = all.BBmsy.cmsy[,nyr]
-      }
-    #><>HW better performance if FFmsy = x for larger values
-    kernel.temp <- ci2d(x.F_Fmsy,y.b_bmsy,nbins=201,factor=2.2,ci.levels=c(0.50,0.80,0.75,0.90,0.95),show="none")
-    kernelF = kernel.temp
-
-    max.x1=max.y1   <- max(c(2, max(kernelF$contours$"0.95"$x,F.Fmsy),na.rm =T))
-    max.y    <- ifelse(max.x1 > 5,min(max(5,F.Fmsy*2),8),max.x1)
-    max.x    <- max(max(2,quantile(y.b_bmsy,0.96)))
-
-    # -------------------------------------
-    ## KOBE plot building
-    # -------------------------------------
-    #Create plot
-    plot(1000,1000,type="b", xlim=c(0,max.x), ylim=c(0,max.y),lty=3,xlab="",ylab=expression(F/F[MSY]), bty="l",  cex.main = 2, cex.lab = 1.35, cex.axis = 1.35,xaxs = "i",yaxs="i")
-    mtext(expression(B/B[MSY]),side=1, line=3, cex=1.3)
-    c1 <- c(-1,100)
-    c2 <- c(1,1)
-
-    # extract interval information from ci2d object
-    # and fill areas using the polygon function
-    zb2 = c(0,1)
-    zf2  = c(1,100)
-    zb1 = c(1,100)
-    zf1  = c(0,1)
-    polygon(c(zb1,rev(zb1)),c(0,0,1,1),col="green",border=0)
-    polygon(c(zb2,rev(zb2)),c(0,0,1,1),col="yellow",border=0)
-    polygon(c(1,100,100,1),c(1,1,100,100),col="orange",border=0)
-    polygon(c(0,1,1,0),c(1,1,100,100),col="red",border=0)
-
-    polygon(kernelF$contours$"0.95"[,2:1],lty=2,border=NA,col="cornsilk4")
-    polygon(kernelF$contours$"0.8"[,2:1],border=NA,lty=2,col="grey")
-    polygon(kernelF$contours$"0.5"[,2:1],border=NA,lty=2,col="cornsilk2")
-    points(B.Bmsy,F.Fmsy,pch=16,cex=1)
-    lines(c1,c2,lty=3,lwd=0.7)
-    lines(c2,c1,lty=3,lwd=0.7)
-    lines(B.Bmsy,F.Fmsy, lty=1,lwd=1.)
-    points(B.Bmsy[1],F.Fmsy[1],col=1,pch=22,bg="white",cex=1.5)
-    points(B.Bmsy[which(yr==int.yr)],F.Fmsy[which(yr==int.yr)],col=1,pch=21,bg="white",cex=1.5)
-    points(B.Bmsy[nyr],F.Fmsy[nyr],col=1,pch=24,bg="white",cex=1.5)
-    # Get Propability
-    Pr.green = sum(ifelse(y.b_bmsy>1 & x.F_Fmsy<1,1,0))/length(y.b_bmsy)*100
-    Pr.red = sum(ifelse(y.b_bmsy<1 & x.F_Fmsy>1,1,0))/length(y.b_bmsy)*100
-    Pr.yellow = sum(ifelse(y.b_bmsy<1 & x.F_Fmsy<1,1,0))/length(y.b_bmsy)*100
-    Pr.orange = sum(ifelse(y.b_bmsy>1 & x.F_Fmsy>1,1,0))/length(y.b_bmsy)*100
-
-    sel.years = c(yr[sel.yr])
-
-    legend('topright',
-           c(paste(start.yr),paste(int.yr),paste(end.yr),"50% C.I.","80% C.I.","95% C.I.",paste0(round(c(Pr.red,Pr.yellow,Pr.orange,Pr.green),1),"%")),
-           lty=c(1,1,1,rep(-1,8)),pch=c(22,21,24,rep(22,8)),pt.bg=c(rep("white",3),"cornsilk2","grey","cornsilk4","red","yellow","orange","green"),
-           col=1,lwd=1.1,cex=1.1,pt.cex=c(rep(1.3,3),rep(1.7,3),rep(2.2,4)),bty="n",y.intersp = 1.)
-
-    if (save.plots==TRUE & kobe.plot==TRUE) {
-      jpgfile<-paste(gsub(":","",gsub("/","-",stock)),"_KOBE.jpg",sep="")
-	  if (retrosp.step>0) jpgfile<-gsub(".jpg", paste0("_retrostep_",retrosp.step,".jpg"), jpgfile) #modification added to save all steps in retrospective analysis
-      dev.copy(jpeg,jpgfile,
-               width = 1024*0.7,
-               height = 1024*0.7,
-               units = "px",
-               pointsize = 18,
-               quality = 95,
-               res=80,
-               antialias="default")
-      dev.off()
-    }
+  # Define filename
+  jpgfile <- paste(gsub(":", "", gsub("/", "-", stock)), "_KOBE.jpg", sep = "")
+  if (retrosp.step > 0) {
+    jpgfile <- gsub(".jpg", paste0("_retrostep_", retrosp.step, ".jpg"), jpgfile)
   }
+
+  # Open JPEG device silently
+  jpeg(
+    filename = jpgfile,
+    width = 1024 * 0.7,
+    height = 1024 * 0.7,
+    units = "px",
+    pointsize = 18,
+    quality = 95,
+    res = 80
+  )
+
+  par(mfrow = c(1, 1))
+  par(mar = c(5.1, 5.1, 2.1, 2.1))
+
+  if (FullSchaefer == TRUE & force.cmsy == FALSE) {
+    x.F_Fmsy <- all.FFmsy.bsm[, nyr]
+    y.b_bmsy <- all.BBmsy.bsm[, nyr]
+  } else {
+    x.F_Fmsy <- all.FFmsy.cmsy[, nyr]
+    y.b_bmsy <- all.BBmsy.cmsy[, nyr]
+  }
+
+  kernelF <- ci2d(x.F_Fmsy, y.b_bmsy, nbins = 201, factor = 2.2,
+                  ci.levels = c(0.50, 0.80, 0.75, 0.90, 0.95), show = "none")
+
+  max.x1 <- max(c(2, max(kernelF$contours$"0.95"$x, F.Fmsy), na.rm = TRUE))
+  max.y <- ifelse(max.x1 > 5, min(max(5, F.Fmsy * 2), 8), max.x1)
+  max.x <- max(max(2, quantile(y.b_bmsy, 0.96)))
+
+  plot(1000, 1000, type = "b", xlim = c(0, max.x), ylim = c(0, max.y),
+       lty = 3, xlab = "", ylab = expression(F/F[MSY]), bty = "l",
+       cex.main = 2, cex.lab = 1.35, cex.axis = 1.35, xaxs = "i", yaxs = "i")
+  mtext(expression(B/B[MSY]), side = 1, line = 3, cex = 1.3)
+
+  # Add Kobe quadrants
+  polygon(c(1, 100, 100, 1), c(1, 1, 100, 100), col = "orange", border = 0)
+  polygon(c(0, 1, 1, 0), c(1, 1, 100, 100), col = "red", border = 0)
+  polygon(c(1, 100, 100, 1), c(0, 0, 1, 1), col = "green", border = 0)
+  polygon(c(0, 1, 1, 0), c(0, 0, 1, 1), col = "yellow", border = 0)
+
+  polygon(kernelF$contours$"0.95"[, 2:1], lty = 2, border = NA, col = "cornsilk4")
+  polygon(kernelF$contours$"0.8"[, 2:1], lty = 2, border = NA, col = "grey")
+  polygon(kernelF$contours$"0.5"[, 2:1], lty = 2, border = NA, col = "cornsilk2")
+
+  points(B.Bmsy, F.Fmsy, pch = 16, cex = 1)
+  lines(c(-1, 100), c(1, 1), lty = 3, lwd = 0.7)
+  lines(c(1, 1), c(0, 100), lty = 3, lwd = 0.7)
+  lines(B.Bmsy, F.Fmsy, lty = 1, lwd = 1)
+  points(B.Bmsy[1], F.Fmsy[1], col = 1, pch = 22, bg = "white", cex = 1.5)
+  points(B.Bmsy[which(yr == int.yr)], F.Fmsy[which(yr == int.yr)], col = 1, pch = 21, bg = "white", cex = 1.5)
+  points(B.Bmsy[nyr], F.Fmsy[nyr], col = 1, pch = 24, bg = "white", cex = 1.5)
+
+  Pr.green <- sum(ifelse(y.b_bmsy > 1 & x.F_Fmsy < 1, 1, 0)) / length(y.b_bmsy) * 100
+  Pr.red <- sum(ifelse(y.b_bmsy < 1 & x.F_Fmsy > 1, 1, 0)) / length(y.b_bmsy) * 100
+  Pr.yellow <- sum(ifelse(y.b_bmsy < 1 & x.F_Fmsy < 1, 1, 0)) / length(y.b_bmsy) * 100
+  Pr.orange <- sum(ifelse(y.b_bmsy > 1 & x.F_Fmsy > 1, 1, 0)) / length(y.b_bmsy) * 100
+
+  legend('topright',
+         c(paste(start.yr), paste(int.yr), paste(end.yr),
+           "50% C.I.", "80% C.I.", "95% C.I.",
+           paste0(round(c(Pr.red, Pr.yellow, Pr.orange, Pr.green), 1), "%")),
+         lty = c(1, 1, 1, rep(-1, 8)),
+         pch = c(22, 21, 24, rep(22, 8)),
+         pt.bg = c(rep("white", 3), "cornsilk2", "grey", "cornsilk4", "red", "yellow", "orange", "green"),
+         col = 1, lwd = 1.1, cex = 1.1,
+         pt.cex = c(rep(1.3, 3), rep(1.7, 3), rep(2.2, 4)),
+         bty = "n", y.intersp = 1.0)
+
+  # Close JPEG device
+  dev.off()
+}
 
   #HW Kobe plot end
   #------------------------------------------------------
@@ -2342,7 +2384,7 @@ for(stock in stocks) {
 	#retrospective analysis plots
 	if (retros == T){
 
-	   if(grepl("win",tolower(Sys.info()['sysname']))) {windows(14,7)}
+	#   if(grepl("win",tolower(Sys.info()['sysname']))) {windows(14,7)}
 		par(mfrow=c(1,2), mar=c(4,5,4,5),  oma=c(2,2,2,2))
 
 	  allyears<-years.retrospective[[1]]
