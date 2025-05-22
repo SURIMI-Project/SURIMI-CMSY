@@ -22,6 +22,9 @@
 # Set CRAN mirror so install.packages() works non-interactively
 options(repos = c(CRAN = "https://cloud.r-project.org"))
 
+
+# install.packages("rjags",dependencies=T)
+
 # Automatic installation of missing packages
 list.of.packages <- c("R2jags","coda","parallel","foreach","doParallel","gplots","mvtnorm","snpar","neuralnet","conicfit","promises")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
@@ -34,9 +37,6 @@ library(snpar)
 library(neuralnet)
 library(conicfit)
 
-if (!require("devtools"))
-  install.packages("devtools")
-devtools::install_github("debinqiu/snpar")
 
 #-----------------------------------------
 # Some general settings ----
@@ -400,7 +400,7 @@ if(write.output==T){
 
 # Read data
 cdat<- read.csv(catch_file, header=T, dec=".", stringsAsFactors = FALSE)
-cinfo        <- read.csv(id_file, header=T, dec=".", stringsAsFactors = FALSE)
+cinfo<- read.csv(id_file, header=T, dec=".", stringsAsFactors = FALSE)
 load(file = nn_file) # load neural network file
 cat("Files", catch_file, ",", id_file,",",nn_file,"read successfully","\n")
 
