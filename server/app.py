@@ -28,9 +28,9 @@ def serve():
     stock_assessment_pb2_grpc.add_StockAssessmentServiceServicer_to_server(stock_assessment_service, server)
 
     # Bind the server to a port
-    server.add_insecure_port("[::]:50201")
+    server.add_insecure_port("[::]:5020")
     server.start()
-    print("[OK] gRPC Server running on port 50201")
+    print("[OK] gRPC Server running on port 5020")
 
     # Wait for the server to stop
     try:
