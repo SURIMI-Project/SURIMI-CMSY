@@ -33,9 +33,9 @@ def serve():
 
 
     # Bind the server to a port
-    server.add_insecure_port("[::]:5020")
+    server.add_insecure_port("[::]:50201")
     server.start()
-    print("[OK] gRPC Server running on port 5020")
+    print("[OK] gRPC Server running on port 50201")
 
     # Wait for the server to stop
     try:

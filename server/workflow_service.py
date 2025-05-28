@@ -75,7 +75,9 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         if not request.simulation_id in self.simulation_dictionary.keys():
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
 
-        if(self.simulation_dictionary[request.simulation_id].step_size != "P1M"):
+        sim = self.simulation_dictionary[request.simulation_id]
+
+        if(sim.step_size != "P1M"):
            # calculation of other step sizes is not implemented yet
            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Only monthly steps are supported. Please set the step size to P1M.")
 
@@ -83,16 +85,44 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         # Check if the year is complete
         # if so, add the biomass of the species to the csv file
 
-        current_year = self.simulation_dictionary[request.simulation_id].current_date_time.year
+        current_year = sim.current_date_time.year
         # Increment the current date time by one month
-        self.simulation_dictionary[request.simulation_id].current_date_time += relativedelta(months=1)
+        sim.current_date_time += relativedelta(months=1)
 
-        if(current_year != self.simulation_dictionary[request.simulation_id].current_date_time.year):
+        if(current_year != sim.current_date_time.year):
             print(f"Year {current_year} is complete. Adding biomass data to the csv file.")
             # Here you would add the logic to write the biomass data to a CSV file or database
             #ALSO CHANGE THE YEAR IN THE ID_FILE.CSV TO THE CURRENT YEAR
 
-            del self.simulation_dictionary[request.simulation_id].aggregated_catch  # Reset the aggregated catch for the new year
-            del self.simulation_dictionary[request.simulation_id].aggregated_biomass  # Reset the aggregated biomass for the new year
+            catch_file = {}
+            # catch_file is a dictionary that will hold the catch data for each species and division
+
+            # Loop over every species in the aggregated_catch_dictionary
+            for species_code, cell_catches in sim.aggregated_catch_dictionary.items():
+                if species_code not in catch_file:
+                    catch_file[species_code] = {}
+
+                for cell_key, catch_value in sim.aggregated_catch_dictionary[species_code].items():
+                    division = self.GetDivision(cell_key[0], cell_key[1])
+
+                    if division not in catch_file[species_code]:
+                        catch_file[species_code][division] = 0.0
+                    # Add the catch of the cell to the catch file for the species  
+                    catch_file[species_code][division] += catch_value
+
+            # Write the catch_file to a CSV file
+            
+            sim.aggregated_catch_dictionary.clear()  # Reset the aggregated catch for the new year
+            sim.aggregated_biomass.clear()  # Reset the aggregated biomass for the new year
 
         return workflow_pb2.SimulateStepResponse()
+
+    def GetDivision(self, latitude: float, longitude: float) -> str:
+        # Example logic: return a division string based on coordinates
+        if 50.0 <= latitude < 60.0 and -5.0 <= longitude < 2.0:
+            return "North Sea"
+        elif 48.0 <= latitude < 50.0 and -6.0 <= longitude < -2.0:
+            return "Western Channel"
+        else:
+            return "Unknown Division"
+    
