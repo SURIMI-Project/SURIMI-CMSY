@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from surimi.v1 import ecology_pb2 as surimi_dot_v1_dot_ecology__pb2
+from surimi.v1 import fishery_pb2 as surimi_dot_v1_dot_fishery__pb2
 
 GRPC_GENERATED_VERSION = '1.71.0'
 GRPC_VERSION = grpc.__version__
@@ -18,14 +18,14 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in surimi/v1/ecology_pb2_grpc.py depends on'
+        + f' but the generated code in surimi/v1/fishery_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
     )
 
 
-class EcologyServiceStub(object):
+class FisheryServiceStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -34,59 +34,59 @@ class EcologyServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.GetBiomass = channel.unary_unary(
-                '/surimi.v1.EcologyService/GetBiomass',
-                request_serializer=surimi_dot_v1_dot_ecology__pb2.GetBiomassRequest.SerializeToString,
-                response_deserializer=surimi_dot_v1_dot_ecology__pb2.GetBiomassResponse.FromString,
+        self.GetSalesSummary = channel.unary_unary(
+                '/surimi.v1.FisheryService/GetSalesSummary',
+                request_serializer=surimi_dot_v1_dot_fishery__pb2.GetSalesSummaryRequest.SerializeToString,
+                response_deserializer=surimi_dot_v1_dot_fishery__pb2.GetSalesSummaryResponse.FromString,
                 _registered_method=True)
-        self.UpdateCatchDispositionSummary = channel.unary_unary(
-                '/surimi.v1.EcologyService/UpdateCatchDispositionSummary',
-                request_serializer=surimi_dot_v1_dot_ecology__pb2.UpdateCatchDispositionSummaryRequest.SerializeToString,
-                response_deserializer=surimi_dot_v1_dot_ecology__pb2.UpdateCatchDispositionSummaryResponse.FromString,
+        self.GetCatchDispositionSummary = channel.unary_unary(
+                '/surimi.v1.FisheryService/GetCatchDispositionSummary',
+                request_serializer=surimi_dot_v1_dot_fishery__pb2.GetCatchDispositionSummaryRequest.SerializeToString,
+                response_deserializer=surimi_dot_v1_dot_fishery__pb2.GetCatchDispositionSummaryResponse.FromString,
                 _registered_method=True)
 
 
-class EcologyServiceServicer(object):
+class FisheryServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def GetBiomass(self, request, context):
+    def GetSalesSummary(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def UpdateCatchDispositionSummary(self, request, context):
+    def GetCatchDispositionSummary(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
 
-def add_EcologyServiceServicer_to_server(servicer, server):
+def add_FisheryServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'GetBiomass': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetBiomass,
-                    request_deserializer=surimi_dot_v1_dot_ecology__pb2.GetBiomassRequest.FromString,
-                    response_serializer=surimi_dot_v1_dot_ecology__pb2.GetBiomassResponse.SerializeToString,
+            'GetSalesSummary': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSalesSummary,
+                    request_deserializer=surimi_dot_v1_dot_fishery__pb2.GetSalesSummaryRequest.FromString,
+                    response_serializer=surimi_dot_v1_dot_fishery__pb2.GetSalesSummaryResponse.SerializeToString,
             ),
-            'UpdateCatchDispositionSummary': grpc.unary_unary_rpc_method_handler(
-                    servicer.UpdateCatchDispositionSummary,
-                    request_deserializer=surimi_dot_v1_dot_ecology__pb2.UpdateCatchDispositionSummaryRequest.FromString,
-                    response_serializer=surimi_dot_v1_dot_ecology__pb2.UpdateCatchDispositionSummaryResponse.SerializeToString,
+            'GetCatchDispositionSummary': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetCatchDispositionSummary,
+                    request_deserializer=surimi_dot_v1_dot_fishery__pb2.GetCatchDispositionSummaryRequest.FromString,
+                    response_serializer=surimi_dot_v1_dot_fishery__pb2.GetCatchDispositionSummaryResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'surimi.v1.EcologyService', rpc_method_handlers)
+            'surimi.v1.FisheryService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('surimi.v1.EcologyService', rpc_method_handlers)
+    server.add_registered_method_handlers('surimi.v1.FisheryService', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
-class EcologyService(object):
+class FisheryService(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def GetBiomass(request,
+    def GetSalesSummary(request,
             target,
             options=(),
             channel_credentials=None,
@@ -99,9 +99,9 @@ class EcologyService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/surimi.v1.EcologyService/GetBiomass',
-            surimi_dot_v1_dot_ecology__pb2.GetBiomassRequest.SerializeToString,
-            surimi_dot_v1_dot_ecology__pb2.GetBiomassResponse.FromString,
+            '/surimi.v1.FisheryService/GetSalesSummary',
+            surimi_dot_v1_dot_fishery__pb2.GetSalesSummaryRequest.SerializeToString,
+            surimi_dot_v1_dot_fishery__pb2.GetSalesSummaryResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -113,7 +113,7 @@ class EcologyService(object):
             _registered_method=True)
 
     @staticmethod
-    def UpdateCatchDispositionSummary(request,
+    def GetCatchDispositionSummary(request,
             target,
             options=(),
             channel_credentials=None,
@@ -126,9 +126,9 @@ class EcologyService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/surimi.v1.EcologyService/UpdateCatchDispositionSummary',
-            surimi_dot_v1_dot_ecology__pb2.UpdateCatchDispositionSummaryRequest.SerializeToString,
-            surimi_dot_v1_dot_ecology__pb2.UpdateCatchDispositionSummaryResponse.FromString,
+            '/surimi.v1.FisheryService/GetCatchDispositionSummary',
+            surimi_dot_v1_dot_fishery__pb2.GetCatchDispositionSummaryRequest.SerializeToString,
+            surimi_dot_v1_dot_fishery__pb2.GetCatchDispositionSummaryResponse.FromString,
             options,
             channel_credentials,
             insecure,

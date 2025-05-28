@@ -3,6 +3,7 @@ syntax = "proto3";
 package surimi.v1;
 
 import "surimi/v1/biomass.proto";
+import "surimi/v1/disposition.proto";
 
 option csharp_namespace = "Grpc.Surimi";
 option java_package = "eu.project.surimi";
@@ -15,6 +16,14 @@ message GetBiomassResponse {
   repeated BiomassGrid biomass_grids = 2;
 }
 
+message UpdateCatchDispositionSummaryRequest {
+  string simulation_id = 1;
+  string measurement_unit = 2; // https://ucum.org/ucum
+  repeated DispositionGrid disposition_grids = 3;
+}
+message UpdateCatchDispositionSummaryResponse {}
+
 service EcologyService {
   rpc GetBiomass(GetBiomassRequest) returns (GetBiomassResponse);
+  rpc UpdateCatchDispositionSummary(UpdateCatchDispositionSummaryRequest) returns (UpdateCatchDispositionSummaryResponse);
 }

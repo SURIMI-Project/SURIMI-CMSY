@@ -5,7 +5,8 @@ import grpc
 from server.ExceptionMetadataInterceptor import ExceptionMetadataInterceptor
 from server.workflow_service import WorkflowService
 from server.stock_assessment_service import StockAssessmentService
-from surimi.v1 import workflow_pb2_grpc, stock_assessment_pb2_grpc
+from server.ecology_service import EcologyService 
+from surimi.v1 import workflow_pb2_grpc, stock_assessment_pb2_grpc, ecology_pb2_grpc
 
 def serve():
 
@@ -24,13 +25,17 @@ def serve():
     workflow_service = WorkflowService(tracer, simulation_dictionary)  # Instantiate the workflow service
     workflow_pb2_grpc.add_WorkflowServiceServicer_to_server(workflow_service, server)
 
+    ecology_service = EcologyService(tracer, simulation_dictionary)  # Instantiate the ecology service
+    ecology_pb2_grpc.add_EcologyServiceServicer_to_server(ecology_service, server)
+
     stock_assessment_service = StockAssessmentService(tracer, simulation_dictionary)  # Instantiate the stock_assessment service
     stock_assessment_pb2_grpc.add_StockAssessmentServiceServicer_to_server(stock_assessment_service, server)
 
+
     # Bind the server to a port
-    server.add_insecure_port("[::]:50201")
+    server.add_insecure_port("[::]:5020")
     server.start()
-    print("[OK] gRPC Server running on port 50201")
+    print("[OK] gRPC Server running on port 5020")
 
     # Wait for the server to stop
     try:

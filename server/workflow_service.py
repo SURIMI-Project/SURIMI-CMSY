@@ -1,4 +1,7 @@
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 import grpc
+from server.Simulation import Simulation
 from surimi.v1 import workflow_pb2, workflow_pb2_grpc
 
 class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
@@ -10,11 +13,19 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         if request.simulation_id in self.simulation_dictionary.keys():
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id already exists.")
 
+        if(request.step_size != "P1M"):
+           # calculation of other step sizes is not implemented yet
+           context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Only monthly steps are supported. Please set the step size to P1M.")
+
+        simulation = Simulation(
+            start_date_time=datetime.now(), #request.start_date_time,
+            step_size=request.step_size,
+        )
         print(f"Init simulation {request.simulation_id} for scenario {request.scenario_id} with start date {request.start_date_time} and step size {request.step_size}")
 
 #           Create a new directory for the simulation results
 #            new_simulation = Simulation(request.simulation_id, request.scenario_id, request.start_date_time, request.step_size)
-        self.simulation_dictionary[request.simulation_id] = "new_simulation"
+        self.simulation_dictionary[request.simulation_id] = simulation
 
         return workflow_pb2.InitResponse()
 
@@ -23,9 +34,37 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
 
         print(f"Update biomass for simulation {request.simulation_id} and measurement unit {request.measurement_unit}")
-# Aggregate the biomass data
-# Check if the year is complete
-# if so, add the biomass of the species to the csv file
+        print(request)  # for debugging purposes
+
+        biomass = 83834.544  # for example
+
+        # Aggregate the biomass data
+        self.simulation_dictionary[request.simulation_id].aggregated_biomass += biomass
 
         return workflow_pb2.InitResponse()
 
+    # this method is called at the end of the month.
+    def SimulateStep(self, request, context):
+        if not request.simulation_id in self.simulation_dictionary.keys():
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
+
+        if(self.simulation_dictionary[request.simulation_id].step_size != "P1M"):
+           # calculation of other step sizes is not implemented yet
+           context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Only monthly steps are supported. Please set the step size to P1M.")
+
+        print(f"SimulateStep for simulation {request.simulation_id}")
+# Check if the year is complete
+# if so, add the biomass of the species to the csv file
+
+        current_year = self.simulation_dictionary[request.simulation_id].current_date_time.year
+        # Increment the current date time by one month
+        self.simulation_dictionary[request.simulation_id].current_date_time += relativedelta(months=1)
+
+        if(current_year != self.simulation_dictionary[request.simulation_id].current_date_time.year):
+            print(f"Year {current_year} is complete. Adding biomass data to the csv file.")
+            # Here you would add the logic to write the biomass data to a CSV file or database
+           
+            self.simulation_dictionary[request.simulation_id].aggregated_catch = 0.0  # Reset the aggregated catch for the new year
+            self.simulation_dictionary[request.simulation_id].aggregated_biomass = 0.0  # Reset the aggregated biomass for the new year
+
+        return workflow_pb2.SimulateStepResponse()
