@@ -5,6 +5,6 @@ class Simulation:
         self.start_date_time = start_date_time
         self.step_size = step_size
         self.current_date_time = start_date_time
-        self.aggregated_biomass = 0.0
-        self.aggregated_catch = 0.0
+        self.aggregated_biomass = {}
+        self.aggregated_catch_dictionary = {}
 

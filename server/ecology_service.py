@@ -16,10 +16,24 @@ class EcologyService(ecology_pb2_grpc.EcologyServiceServicer):
 # if so, add the catch of the species to the csv file
         print(request)  # for debugging purposes
 
+        sim = self.simulation_dictionary[request.simulation_id]
 
-        catch = 545.23  # for example
+        # Loop over every grid in Disposition_grids
+        for grid in request.disposition_grids:
+            # Check if the species is already in the aggregated_catch_dictionary
+            if grid.species_code not in sim.aggregated_catch_dictionary:
+                sim.aggregated_catch_dictionary[grid.species_code] = {}
 
-        self.simulation_dictionary[request.simulation_id].aggregated_catch += catch
+            # Loop over every cell in the grid
+            for cell in grid.disposition_cells:
+                cell_key = (cell.latitude, cell.longitude)
+                # Check if the cell is already in the aggregated_catch_dictionary for the species   
+                if cell_key not in sim.aggregated_catch_dictionary[grid.species_code]:
+                    sim.aggregated_catch_dictionary[grid.species_code][cell_key] = 0.0
+                
+                # Add the catch of the cell to the aggregated_catch_dictionary for the species  
+                sim.aggregated_catch_dictionary[grid.species_code][cell_key] += cell.gross_catch                    
+
 
         return ecology_pb2.UpdateCatchDispositionSummaryResponse()
 

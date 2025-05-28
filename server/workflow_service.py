@@ -50,10 +50,23 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         print(f"Update biomass for simulation {request.simulation_id} and measurement unit {request.measurement_unit}")
         print(request)  # for debugging purposes
 
-        biomass = 83834.544  # for example
+        sim = self.simulation_dictionary[request.simulation_id]
 
-        # Aggregate the biomass data
-        self.simulation_dictionary[request.simulation_id].aggregated_biomass += biomass
+        # Loop over every grid in biomass_grids
+        for grid in request.biomass_grids:
+            # Check if the species is already in the aggregated_biomass
+            if grid.species_code not in sim.aggregated_biomass:
+                sim.aggregated_biomass[grid.species_code] = {}
+
+            # Loop over every cell in the grid
+            for cell in grid.biomass_cells:
+                cell_key = (cell.latitude, cell.longitude)
+                # Check if the cell is already in the aggregated_biomass for the species   
+                if cell_key not in sim.aggregated_biomass[grid.species_code]:
+                    sim.aggregated_biomass[grid.species_code][cell_key] = 0.0
+                
+                # Add the biomass of the cell to the aggregated_biomass for the species  
+                sim.aggregated_biomass[grid.species_code][cell_key] += cell.biomass                    
 
         return workflow_pb2.InitResponse()
 
@@ -67,8 +80,8 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Only monthly steps are supported. Please set the step size to P1M.")
 
         print(f"SimulateStep for simulation {request.simulation_id}")
-# Check if the year is complete
-# if so, add the biomass of the species to the csv file
+        # Check if the year is complete
+        # if so, add the biomass of the species to the csv file
 
         current_year = self.simulation_dictionary[request.simulation_id].current_date_time.year
         # Increment the current date time by one month
@@ -77,8 +90,9 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         if(current_year != self.simulation_dictionary[request.simulation_id].current_date_time.year):
             print(f"Year {current_year} is complete. Adding biomass data to the csv file.")
             # Here you would add the logic to write the biomass data to a CSV file or database
-        #ALSO CHANGE THE YEAR IN THE ID_FILE.CSV TO THE CURRENT YEAR
-            self.simulation_dictionary[request.simulation_id].aggregated_catch = 0.0  # Reset the aggregated catch for the new year
-            self.simulation_dictionary[request.simulation_id].aggregated_biomass = 0.0  # Reset the aggregated biomass for the new year
+            #ALSO CHANGE THE YEAR IN THE ID_FILE.CSV TO THE CURRENT YEAR
+
+            del self.simulation_dictionary[request.simulation_id].aggregated_catch  # Reset the aggregated catch for the new year
+            del self.simulation_dictionary[request.simulation_id].aggregated_biomass  # Reset the aggregated biomass for the new year
 
         return workflow_pb2.SimulateStepResponse()
