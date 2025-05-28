@@ -3,6 +3,7 @@ from dateutil.relativedelta import relativedelta
 import grpc
 from server.Simulation import Simulation
 from surimi.v1 import workflow_pb2, workflow_pb2_grpc
+from pathlib import Path
 
 class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
     def __init__(self, tracer, simulation_dictionary):
@@ -23,6 +24,19 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         )
         print(f"Init simulation {request.simulation_id} for scenario {request.scenario_id} with start date {request.start_date_time} and step size {request.step_size}")
 
+# ✅ Create a directory named after the simulation_id inside ./simulations
+        output_directory = Path("simulations") / request.simulation_id
+        try:
+            # Creates the directory. parents=True makes sure "simulations/" is created if missing.
+            # exist_ok=False means it will fail if the folder already exists — avoids overwriting.
+            output_directory.mkdir(parents=True, exist_ok=False)
+            print(f"Created simulation directory: {output_directory}")
+        except FileExistsError:
+            context.abort(grpc.StatusCode.ALREADY_EXISTS, f"Directory already exists: {output_directory}")
+        except Exception as e:
+            context.abort(grpc.StatusCode.INTERNAL, f"Directory creation failed: {str(e)}")
+
+##TODO: COPY CATCH.CSV AND ID FILES TO THE NEW DIRECTORY
 #           Create a new directory for the simulation results
 #            new_simulation = Simulation(request.simulation_id, request.scenario_id, request.start_date_time, request.step_size)
         self.simulation_dictionary[request.simulation_id] = simulation
@@ -63,7 +77,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         if(current_year != self.simulation_dictionary[request.simulation_id].current_date_time.year):
             print(f"Year {current_year} is complete. Adding biomass data to the csv file.")
             # Here you would add the logic to write the biomass data to a CSV file or database
-           
+        #ALSO CHANGE THE YEAR IN THE ID_FILE.CSV TO THE CURRENT YEAR
             self.simulation_dictionary[request.simulation_id].aggregated_catch = 0.0  # Reset the aggregated catch for the new year
             self.simulation_dictionary[request.simulation_id].aggregated_biomass = 0.0  # Reset the aggregated biomass for the new year
 
