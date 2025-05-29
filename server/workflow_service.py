@@ -4,6 +4,7 @@ import grpc
 from server.Simulation import Simulation
 from surimi.v1 import workflow_pb2, workflow_pb2_grpc
 from pathlib import Path
+import shutil
 
 class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
     def __init__(self, tracer, simulation_dictionary):
@@ -36,7 +37,16 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         except Exception as e:
             context.abort(grpc.StatusCode.INTERNAL, f"Directory creation failed: {str(e)}")
 
-##TODO: COPY CATCH.CSV AND ID FILES TO THE NEW DIRECTORY
+# Copy historical catch.csv and id_file.csv to the new simulation directory
+        try:
+            template_dir = Path("template_data")
+            shutil.copy(template_dir / "catch.csv", output_directory / "catch.csv")
+            shutil.copy(template_dir / "id_file.csv", output_directory / "id_file.csv")
+            print(f"Copied catch.csv and id_file.csv to {output_directory}")
+        except Exception as e:
+            context.abort(grpc.StatusCode.INTERNAL, f"Failed to copy template files: {e}")
+            
+            
 #           Create a new directory for the simulation results
 #            new_simulation = Simulation(request.simulation_id, request.scenario_id, request.start_date_time, request.step_size)
         self.simulation_dictionary[request.simulation_id] = simulation
