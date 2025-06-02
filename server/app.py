@@ -1,5 +1,7 @@
 import os
 from otlp_tracing import configure_oltp_grpc_tracing
+from logging_config import configure_logging  # Import the logging configuration function
+
 from concurrent import futures
 import grpc
 from server.ExceptionMetadataInterceptor import ExceptionMetadataInterceptor
@@ -9,7 +11,8 @@ from server.ecology_service import EcologyService
 from surimi.v1 import workflow_pb2_grpc, stock_assessment_pb2_grpc, ecology_pb2_grpc
 
 def serve():
-
+    # Configure logging
+    logger = configure_logging()
     simulation_dictionary = {}
 
     otel_exporter_otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") or "http://localhost:4317"
