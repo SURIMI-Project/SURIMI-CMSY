@@ -10,6 +10,10 @@ class S3_Storage:
             print("AWS_BUCKET_NAME environment variable not set. Aborting S3 upload.")
             return
 
+        if not os.environ.get('AWS_ACCESS_KEY_ID'):
+            print("AWS_ACCESS_KEY_ID environment variable not set. Aborting S3 upload.")
+            return
+
         bucket_name = os.environ.get('AWS_BUCKET_NAME') 
 
         print(f"Uploading files from {source_directory} to S3...")

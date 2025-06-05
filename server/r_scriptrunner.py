@@ -4,6 +4,7 @@ import os
 class R_ScriptRunner:
     @staticmethod
     def run_r_script(script):
+        print(f"Running R script: {script}")
 
         os.environ["LANG"] = "en_US.UTF-8"
         os.environ["TINYTEX_USERMODE"] = "true"

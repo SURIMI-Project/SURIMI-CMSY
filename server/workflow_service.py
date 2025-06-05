@@ -31,7 +31,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         S3_Storage.DownloadFilesFromS3("Surimi-cmsy/Config", "R_files")
 
 # ✅ Create a directory named after the simulation_id inside ./simulations
-        output_directory = Path("..") / Path("simulations") / request.simulation_id
+        output_directory = Path(__file__).parent.parent.parent.resolve() / Path("simulations") / request.simulation_id
         try:
             # Creates the directory. parents=True makes sure "simulations/" is created if missing.
             # exist_ok=False means it will fail if the folder already exists — avoids overwriting.
@@ -43,7 +43,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
             context.abort(grpc.StatusCode.INTERNAL, f"Directory creation failed: {str(e)}")
 
         # Copy catch_file.csv, if_file.csv and AA_CMSY++.R from R_files to output_directory
-        src_dir = Path("R_files")
+        src_dir = Path(__file__).parent.parent / Path("R_files")
         shutil.copy(src_dir / "catch_file.csv", output_directory / "catch_file.csv")
         shutil.copy(src_dir / "id_file.csv", output_directory / "id_file.csv")
         shutil.copy(src_dir / "AA_CMSY++.R", output_directory / "AA_CMSY++.R")
