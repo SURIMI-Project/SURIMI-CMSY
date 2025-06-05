@@ -4,7 +4,7 @@ from logging_config import configure_logging  # Import the logging configuration
 
 from concurrent import futures
 import grpc
-from server.ExceptionMetadataInterceptor import ExceptionMetadataInterceptor
+from server.exception_metadata_interceptor import ExceptionMetadataInterceptor
 from server.workflow_service import WorkflowService
 from server.stock_assessment_service import StockAssessmentService
 from server.ecology_service import EcologyService 
@@ -18,6 +18,15 @@ def serve():
     otel_exporter_otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") or "http://localhost:4317"
 
     tracer = configure_oltp_grpc_tracing( endpoint=otel_exporter_otlp_endpoint)  # Configure OpenTelemetry tracing
+
+    print(f"AWS_ACCESS_KEY_ID: {os.environ.get('AWS_ACCESS_KEY_ID')}")
+    print(f"AWS_SECRET_ACCESS_KEY: {os.environ.get('AWS_SECRET_ACCESS_KEY')}")
+    print(f"AWS_SESSION_TOKEN: {os.environ.get('AWS_SESSION_TOKEN')}")
+    print(f"AWS_S3_ENDPOINT: {os.environ.get('AWS_S3_ENDPOINT')}")
+    print(f"AWS_DEFAULT_REGION: {os.environ.get('AWS_DEFAULT_REGION')}")
+    print(f"AWS_BUCKET_NAME: {os.environ.get('AWS_BUCKET_NAME')}")
+    print(f"OTEL_EXPORTER_OTLP_ENDPOINT: {os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")}")
+
 
     print("Starting gRPC Server...")
 

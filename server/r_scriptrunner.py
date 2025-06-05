@@ -1,38 +1,31 @@
+import subprocess
 import os
-from pathlib import Path
 
 class R_ScriptRunner:
     @staticmethod
-    def run_r_script():
+    def run_r_script(script):
 
-        # test code to write to a file
-        path_prefix = os.environ.get("EDITO_INFRA_OUTPUT", "C:/Temp")
-        my_file_path = Path(path_prefix) / "myfile.txt"
-        print(f"Writing to test-file: {my_file_path}")
-        f = open(my_file_path, "a")
-        f.write("Now the file has more content!")
-        f.close()
-
-        # Set R_HOME **before** importing rpy2
-#        os.environ['R_HOME'] = r'C:\Program Files\R\R-4.4.1'  # Make sure this is the correct R install path
         os.environ["LANG"] = "en_US.UTF-8"
         os.environ["TINYTEX_USERMODE"] = "true"
 
-        # Import rpy2 here, after env vars are set
-        from rpy2 import robjects
+        directory = os.path.dirname(script)
+        print(f"Changing working directory to: {directory}")
+        os.chdir(directory)
 
-        current_dir = Path.cwd()
-        print(f"Current working directory: {current_dir}")
-        
-        if current_dir.name != "R_files":
-            current_dir = current_dir / "R_files"
-            os.chdir(current_dir)
+        # Run the R script using subprocess
+        print(f"Start executing {script} using Rscript.")
+        result = subprocess.run(
+            ["Rscript", script],
+            capture_output=True,
+            text=True
+        )
 
-        # Full path to the R script
-        script_path = Path.cwd() / "AA_CMSY++.R"
+        print("Rscript stdout:")
+        print(result.stdout)
+        print("Rscript stderr:")
+        print(result.stderr)
 
-        # Run the R script
-        print(f"Start executing {str(script_path)}.")
-        robjects.r.source(str(script_path))
-
-        print("✅ CMSY++ completed.")
+        if result.returncode == 0:
+            print("✅ CMSY++ completed.")
+        else:
+            print(f"❌ CMSY++ failed with exit code {result.returncode}.")
