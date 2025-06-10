@@ -1,20 +1,32 @@
 import os
 from otlp_tracing import configure_oltp_grpc_tracing
+from logging_config import configure_logging  # Import the logging configuration function
+
 from concurrent import futures
 import grpc
-from server.ExceptionMetadataInterceptor import ExceptionMetadataInterceptor
+from server.exception_metadata_interceptor import ExceptionMetadataInterceptor
 from server.workflow_service import WorkflowService
 from server.stock_assessment_service import StockAssessmentService
 from server.ecology_service import EcologyService 
 from surimi.v1 import workflow_pb2_grpc, stock_assessment_pb2_grpc, ecology_pb2_grpc
 
 def serve():
-
+    # Configure logging
+    logger = configure_logging()
     simulation_dictionary = {}
 
     otel_exporter_otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") or "http://localhost:4317"
 
     tracer = configure_oltp_grpc_tracing( endpoint=otel_exporter_otlp_endpoint)  # Configure OpenTelemetry tracing
+
+    print(f"AWS_ACCESS_KEY_ID: {os.environ.get('AWS_ACCESS_KEY_ID')}")
+    print(f"AWS_SECRET_ACCESS_KEY: {os.environ.get('AWS_SECRET_ACCESS_KEY')}")
+    print(f"AWS_SESSION_TOKEN: {os.environ.get('AWS_SESSION_TOKEN')}")
+    print(f"AWS_S3_ENDPOINT: {os.environ.get('AWS_S3_ENDPOINT')}")
+    print(f"AWS_DEFAULT_REGION: {os.environ.get('AWS_DEFAULT_REGION')}")
+    print(f"AWS_BUCKET_NAME: {os.environ.get('AWS_BUCKET_NAME')}")
+    print(f"OTEL_EXPORTER_OTLP_ENDPOINT: {os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")}")
+
 
     print("Starting gRPC Server...")
 
@@ -33,9 +45,9 @@ def serve():
 
 
     # Bind the server to a port
-    server.add_insecure_port("[::]:50201")
+    server.add_insecure_port("[::]:5020")
     server.start()
-    print("[OK] gRPC Server running on port 50201")
+    print("[OK] gRPC Server running on port 5020")
 
     # Wait for the server to stop
     try:

@@ -1,7 +1,9 @@
 from datetime import datetime
+import os
 from dateutil.relativedelta import relativedelta
 import grpc
-from server.Simulation import Simulation
+from server.s3_storage import S3_Storage
+from server.simulation import Simulation
 from surimi.v1 import workflow_pb2, workflow_pb2_grpc
 from pathlib import Path
 import shutil
@@ -26,32 +28,29 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         )
         print(f"Init simulation {request.simulation_id} for scenario {request.scenario_id} with start date {request.start_date_time} and step size {request.step_size}")
 
+        # download the catch_file.csv, if_file.csv and AA_CMSY++.R from the S3 bucket to R_files
+        S3_Storage.DownloadFilesFromS3("Surimi-cmsy/Config", "R_files")
+
 # ✅ Create a directory named after the simulation_id inside ./simulations
-        output_directory = Path("simulations") / request.simulation_id
+        output_directory = Path(__file__).parent.parent.parent.resolve() / Path("simulations") / request.simulation_id
         try:
             # Creates the directory. parents=True makes sure "simulations/" is created if missing.
             # exist_ok=False means it will fail if the folder already exists — avoids overwriting.
-            output_directory.mkdir(parents=True, exist_ok=False)
+            output_directory.mkdir(parents=True, exist_ok=True)
             print(f"Created simulation directory: {output_directory}")
         except FileExistsError:
             context.abort(grpc.StatusCode.ALREADY_EXISTS, f"Directory already exists: {output_directory}")
         except Exception as e:
             context.abort(grpc.StatusCode.INTERNAL, f"Directory creation failed: {str(e)}")
 
-##TODO: COPY CATCH.CSV AND ID FILES TO THE NEW DIRECTORY
-# ✅ Copy catch_file.csv and id_file.csv to the new simulation directory
-        try:
-            base_dir = Path(__file__).resolve().parent.parent  # move from /server to project root
-            r_files_dir = base_dir / "R_files"
-            shutil.copy(r_files_dir / "catch_file.csv", output_directory / "catch_file.csv")
-            shutil.copy(r_files_dir / "id_file.csv", output_directory / "id_file.csv")
-            print(f"Copied catch_file.csv and id_file.csv to {output_directory}")
-        except Exception as e:
-            context.abort(grpc.StatusCode.INTERNAL, f"Failed to copy CSV files: {e}")
+        # Copy catch_file.csv, if_file.csv and AA_CMSY++.R from R_files to output_directory
+        src_dir = Path(__file__).parent.parent.resolve() / Path("R_files")
+        print(f"Copying files from {src_dir} to {output_directory}")
+        shutil.copy(src_dir / "catch_file.csv", output_directory / "catch_file.csv")
+        shutil.copy(src_dir / "id_file.csv", output_directory / "id_file.csv")
+        shutil.copy(src_dir / "AA_CMSY++.R", output_directory / "AA_CMSY++.R")
+        shutil.copy(src_dir / "ffnn.bin", output_directory / "ffnn.bin")
 
-
-#           Create a new directory for the simulation results
-#            new_simulation = Simulation(request.simulation_id, request.scenario_id, request.start_date_time, request.step_size)
         self.simulation_dictionary[request.simulation_id] = simulation
         return workflow_pb2.InitResponse()
 
