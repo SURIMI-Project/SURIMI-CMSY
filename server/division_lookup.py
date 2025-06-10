@@ -1,0 +1,48 @@
+import geopandas as gpd
+from shapely.geometry import Point
+from pathlib import Path
+
+# Load the FAO shapefile once when the module is imported
+try:
+    base_dir = Path(__file__).resolve().parent.parent
+    shapefile_path = base_dir / "R_files" / "Shapefile" / "FAO_major_division_37.shp"
+
+
+    fao_gdf = gpd.read_file(shapefile_path).to_crs(epsg=4326)
+    print(f"[INFO] FAO shapefile loaded with {len(fao_gdf)} records.")
+except Exception as e:
+    print(f"[ERROR] Could not load FAO shapefile: {e}")
+    fao_gdf = None  # Prevent crash; fail gracefully
+
+
+def get_division(latitude: float, longitude: float) -> str:
+    """
+    Given latitude and longitude, returns the matching FAO division name.
+    Returns 'Unknown Division' if no match is found or data is unavailable.
+    """
+    if fao_gdf is None:
+        return "Unknown Division"
+
+    try:
+        point = Point(longitude, latitude)  # ⚠️ Note: (lon, lat) order
+        match = fao_gdf[fao_gdf.geometry.contains(point)]
+
+        if not match.empty:
+            return match.iloc[0].get("F_NAME", "Unknown Division")
+
+    except Exception as e:
+        print(f"[ERROR] get_division failed for ({latitude}, {longitude}): {e}")
+
+    return "Unknown Division"
+
+if __name__ == "__main__":
+    # 🚀 Quick test of the get_division function
+    test_points = [
+        (-2.105, 35.0805),   # Western Mediterranean?
+        (-2.095, 35.805)
+    ]
+
+    print("[TEST] Running FAO division lookup test...\n")
+    for lon, lat in test_points:
+        result = get_division(lat, lon)
+        print(f"Coordinates ({lat}, {lon}) → Division: {result}")

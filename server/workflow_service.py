@@ -7,6 +7,7 @@ from server.simulation import Simulation
 from surimi.v1 import workflow_pb2, workflow_pb2_grpc
 from pathlib import Path
 import shutil
+from server.division_lookup import get_division  # Import division_lookup
 
 class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
     def __init__(self, tracer, simulation_dictionary):
@@ -51,7 +52,6 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         shutil.copy(src_dir / "ffnn.bin", output_directory / "ffnn.bin")
 
         self.simulation_dictionary[request.simulation_id] = simulation
-
         return workflow_pb2.InitResponse()
 
     def UpdateBiomass(self, request, context):
@@ -114,26 +114,19 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
                     catch_file[species_code] = {}
 
                 for cell_key, catch_value in sim.aggregated_catch_dictionary[species_code].items():
-                    division = self.GetDivision(cell_key[0], cell_key[1])
-
+                    division = get_division(cell_key[0], cell_key[1])  # Use spatial lookup instead of hardcoded logic
+                    print(f"→ Division for coordinates {cell_key}: {division}")
+                    
                     if division not in catch_file[species_code]:
                         catch_file[species_code][division] = 0.0
                     # Add the catch of the cell to the catch file for the species  
                     catch_file[species_code][division] += catch_value
 
-            # Write the catch_file to a CSV file
+            # Write an extra row to the catch_file.csv 
             
             sim.aggregated_catch_dictionary.clear()  # Reset the aggregated catch for the new year
             sim.aggregated_biomass.clear()  # Reset the aggregated biomass for the new year
 
         return workflow_pb2.SimulateStepResponse()
 
-    def GetDivision(self, latitude: float, longitude: float) -> str:
-        # Example logic: return a division string based on coordinates
-        if 50.0 <= latitude < 60.0 and -5.0 <= longitude < 2.0:
-            return "North Sea"
-        elif 48.0 <= latitude < 50.0 and -6.0 <= longitude < -2.0:
-            return "Western Channel"
-        else:
-            return "Unknown Division"
     
