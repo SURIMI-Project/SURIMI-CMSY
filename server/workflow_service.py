@@ -43,7 +43,8 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
             context.abort(grpc.StatusCode.INTERNAL, f"Directory creation failed: {str(e)}")
 
         # Copy catch_file.csv, if_file.csv and AA_CMSY++.R from R_files to output_directory
-        src_dir = Path(__file__).parent.parent / Path("R_files")
+        src_dir = Path(__file__).parent.parent.resolve() / Path("R_files")
+        print(f"Copying files from {src_dir} to {output_directory}")
         shutil.copy(src_dir / "catch_file.csv", output_directory / "catch_file.csv")
         shutil.copy(src_dir / "id_file.csv", output_directory / "id_file.csv")
         shutil.copy(src_dir / "AA_CMSY++.R", output_directory / "AA_CMSY++.R")
