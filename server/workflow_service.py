@@ -32,7 +32,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         S3_Storage.DownloadFilesFromS3("Surimi-cmsy/Config", "R_files")
 
 # ✅ Create a directory named after the simulation_id inside ./simulations
-        output_directory = Path(__file__).parent.parent.parent.resolve() / Path("simulations") / request.simulation_id
+        output_directory = Path(__file__).parent.parent.resolve() / Path("simulations") / request.simulation_id
         try:
             # Creates the directory. parents=True makes sure "simulations/" is created if missing.
             # exist_ok=False means it will fail if the folder already exists — avoids overwriting.
