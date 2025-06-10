@@ -43,7 +43,6 @@ def serve():
     stock_assessment_service = StockAssessmentService(tracer, simulation_dictionary)  # Instantiate the stock_assessment service
     stock_assessment_pb2_grpc.add_StockAssessmentServiceServicer_to_server(stock_assessment_service, server)
 
-
     # Bind the server to a port
     server.add_insecure_port("[::]:5020")
     server.start()
