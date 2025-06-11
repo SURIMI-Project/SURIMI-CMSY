@@ -36,13 +36,13 @@ def get_division(latitude: float, longitude: float) -> str:
     return "Unknown Division"
 
 if __name__ == "__main__":
-    # 🚀 Quick test of the get_division function
+    # Each tuple: (latitude, longitude)
     test_points = [
-        (-2.105, 35.0805),   # Western Mediterranean?
-        (-2.095, 35.805)
+        (35.0805, -2.105),   # Example: latitude, longitude
+        (35.805, -2.095)
     ]
 
     print("[TEST] Running FAO division lookup test...\n")
-    for lon, lat in test_points:
+    for lat, lon in test_points:
         result = get_division(lat, lon)
         print(f"Coordinates ({lat}, {lon}) → Division: {result}")
