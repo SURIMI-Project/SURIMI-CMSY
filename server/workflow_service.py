@@ -8,6 +8,10 @@ from surimi.v1 import workflow_pb2, workflow_pb2_grpc
 from pathlib import Path
 import shutil
 from server.division_lookup import get_division  # Import division_lookup
+from server.species_lookup import species_lookup_instance # Import the new species lookup instance
+import logging
+
+logger = logging.getLogger(__name__)
 
 class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
     def __init__(self, tracer, simulation_dictionary):
@@ -65,6 +69,11 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
 
         # Loop over every grid in biomass_grids
         for grid in request.biomass_grids:
+            
+            # ✅ Lookup common name for species_code
+            common_name = species_lookup_instance.get_or_add_common_name(grid.species_code)
+            logger.debug(f"Processing species_code: {grid.species_code}, Common Name: {common_name}")
+
             # Check if the species is already in the aggregated_biomass
             if grid.species_code not in sim.aggregated_biomass:
                 sim.aggregated_biomass[grid.species_code] = {}
@@ -110,6 +119,10 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
 
             # Loop over every species in the aggregated_catch_dictionary
             for species_code, cell_catches in sim.aggregated_catch_dictionary.items():
+                
+                # ✅ Lookup species name to ensure it's tracked in the common name registry
+                _ = species_lookup_instance.get_or_add_common_name(species_code)
+
                 if species_code not in catch_file:
                     catch_file[species_code] = {}
 
@@ -128,5 +141,3 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
             sim.aggregated_biomass.clear()  # Reset the aggregated biomass for the new year
 
         return workflow_pb2.SimulateStepResponse()
-
-    
