@@ -1,7 +1,6 @@
 from pathlib import Path
 import subprocess
 import os
-import threading
 
 from server.s3_storage import S3_Storage
 
@@ -37,7 +36,3 @@ class R_ScriptRunner:
             S3_Storage.UploadFilesToS3(os.path.dirname(script), f"Surimi-cmsy/Simulations/{simulation_id}")
         else:
             print(f"❌ CMSY++ failed with exit code {result.returncode}.")
-
-    @staticmethod
-    def run_r_script_s3_upload_background(script_name, simulation_id):
-        threading.Thread(target=R_ScriptRunner.run_r_script_s3_upload, args=(script_name,simulation_id), daemon=True).start()
