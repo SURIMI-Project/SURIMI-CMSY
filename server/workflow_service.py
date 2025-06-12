@@ -8,7 +8,7 @@ from surimi.v1 import workflow_pb2, workflow_pb2_grpc
 from pathlib import Path
 import shutil
 from server.division_lookup import get_division  # Import division_lookup
-from server.species_lookup import species_lookup_instance # Import the new species lookup instance
+from server.species_lookup import get_common_name  # Import species_lookup
 import logging
 
 logger = logging.getLogger(__name__)
@@ -69,9 +69,9 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
 
         # Loop over every grid in biomass_grids
         for grid in request.biomass_grids:
-            
-            # ✅ Lookup common name for species_code
-            common_name = species_lookup_instance.get_or_add_common_name(grid.species_code)
+            # Lookup/Add common name for species_code 
+            common_name = get_common_name(grid.species_code)  # ✅ ADDED
+            print(f"🧬 Biomass update for species {grid.species_code} ({common_name})")  
             logger.debug(f"Processing species_code: {grid.species_code}, Common Name: {common_name}")
 
             # Check if the species is already in the aggregated_biomass
@@ -120,11 +120,13 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
             # Loop over every species in the aggregated_catch_dictionary
             for species_code, cell_catches in sim.aggregated_catch_dictionary.items():
                 
-                # ✅ Lookup species name to ensure it's tracked in the common name registry
-                _ = species_lookup_instance.get_or_add_common_name(species_code)
+                # ✅ Lookup species name for logging
+                common_name = get_common_name(species_code)  
+                print(f"📦 Processing catch for species {species_code} ({common_name})")  
 
-                if species_code not in catch_file:
-                    catch_file[species_code] = {}
+               #here to use the common name and not species_code
+               # if species_code not in catch_file:
+                catch_file[species_code] = {}
 
                 for cell_key, catch_value in sim.aggregated_catch_dictionary[species_code].items():
                     division = get_division(cell_key[0], cell_key[1])  # Use spatial lookup instead of hardcoded logic
