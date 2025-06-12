@@ -7,8 +7,8 @@ from server.simulation import Simulation
 from surimi.v1 import workflow_pb2, workflow_pb2_grpc
 from pathlib import Path
 import shutil
-from server.division_lookup import get_division  # Import division_lookup
-from server.species_lookup import get_common_name  # Import species_lookup
+from server.division_lookup import get_division
+from server.species_lookup import get_common_name
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,12 +22,12 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         if request.simulation_id in self.simulation_dictionary.keys():
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id already exists.")
 
-        if(request.step_size != "P1M"):
-           # calculation of other step sizes is not implemented yet
-           context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Only monthly steps are supported. Please set the step size to P1M.")
+        if request.step_size != "P1M":
+            # calculation of other step sizes is not implemented yet
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Only monthly steps are supported. Please set the step size to P1M.")
 
         simulation = Simulation(
-            start_date_time=datetime.now(), #request.start_date_time,
+            start_date_time=datetime.now(),
             step_size=request.step_size,
         )
         print(f"Init simulation {request.simulation_id} for scenario {request.scenario_id} with start date {request.start_date_time} and step size {request.step_size}")
@@ -35,7 +35,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         # download the catch_file.csv, if_file.csv and AA_CMSY++.R from the S3 bucket to R_files
         S3_Storage.DownloadFilesFromS3("Surimi-cmsy/Config", "R_files")
 
-# ✅ Create a directory named after the simulation_id inside ./simulations
+        # ✅ Create a directory named after the simulation_id inside ./simulations
         output_directory = Path(__file__).parent.parent.resolve() / Path("simulations") / request.simulation_id
         try:
             # Creates the directory. parents=True makes sure "simulations/" is created if missing.
@@ -59,7 +59,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         return workflow_pb2.InitResponse()
 
     def UpdateBiomass(self, request, context):
-        if not request.simulation_id in self.simulation_dictionary.keys():
+        if request.simulation_id not in self.simulation_dictionary:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
 
         print(f"Update biomass for simulation {request.simulation_id} and measurement unit {request.measurement_unit}")
@@ -69,11 +69,6 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
 
         # Loop over every grid in biomass_grids
         for grid in request.biomass_grids:
-            # Lookup/Add common name for species_code 
-            common_name = get_common_name(grid.species_code)  # ✅ ADDED
-            print(f"🧬 Biomass update for species {grid.species_code} ({common_name})")  
-            logger.debug(f"Processing species_code: {grid.species_code}, Common Name: {common_name}")
-
             # Check if the species is already in the aggregated_biomass
             if grid.species_code not in sim.aggregated_biomass:
                 sim.aggregated_biomass[grid.species_code] = {}
@@ -84,24 +79,24 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
                 # Check if the cell is already in the aggregated_biomass for the species   
                 if cell_key not in sim.aggregated_biomass[grid.species_code]:
                     sim.aggregated_biomass[grid.species_code][cell_key] = 0.0
-                
                 # Add the biomass of the cell to the aggregated_biomass for the species  
-                sim.aggregated_biomass[grid.species_code][cell_key] += cell.biomass                    
+                sim.aggregated_biomass[grid.species_code][cell_key] += cell.biomass
 
         return workflow_pb2.InitResponse()
 
     # this method is called at the end of the month.
     def SimulateStep(self, request, context):
-        if not request.simulation_id in self.simulation_dictionary.keys():
+        if request.simulation_id not in self.simulation_dictionary:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
 
         sim = self.simulation_dictionary[request.simulation_id]
 
-        if(sim.step_size != "P1M"):
-           # calculation of other step sizes is not implemented yet
-           context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Only monthly steps are supported. Please set the step size to P1M.")
+        if sim.step_size != "P1M":
+            # calculation of other step sizes is not implemented yet
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Only monthly steps are supported. Please set the step size to P1M.")
 
         print(f"SimulateStep for simulation {request.simulation_id}")
+
         # Check if the year is complete
         # if so, add the biomass of the species to the csv file
 
@@ -109,37 +104,32 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         # Increment the current date time by one month
         sim.current_date_time += relativedelta(months=1)
 
-        if(current_year != sim.current_date_time.year):
-            print(f"Year {current_year} is complete. Adding biomass data to the csv file.")
-            # Here you would add the logic to write the biomass data to a CSV file or database
-            #ALSO CHANGE THE YEAR IN THE ID_FILE.CSV TO THE CURRENT YEAR
+        if current_year != sim.current_date_time.year:
+            print(f"Year {current_year} is complete. Processing catch data.")
 
             catch_file = {}
             # catch_file is a dictionary that will hold the catch data for each species and division
 
             # Loop over every species in the aggregated_catch_dictionary
             for species_code, cell_catches in sim.aggregated_catch_dictionary.items():
-                
-                # ✅ Lookup species name for logging
-                common_name = get_common_name(species_code)  
-                print(f"📦 Processing catch for species {species_code} ({common_name})")  
+                for cell_key, catch_value in cell_catches.items():
+                    division = get_division(cell_key[0], cell_key[1])
+                    common_name = get_common_name(species_code)
+                    print(f"📦 Catch for species {species_code} ({common_name}) in division {division}")
 
-               #here to use the common name and not species_code
-               # if species_code not in catch_file:
-                catch_file[species_code] = {}
+                    if common_name not in catch_file:
+                        catch_file[common_name] = {}
 
-                for cell_key, catch_value in sim.aggregated_catch_dictionary[species_code].items():
-                    division = get_division(cell_key[0], cell_key[1])  # Use spatial lookup instead of hardcoded logic
-                    print(f"→ Division for coordinates {cell_key}: {division}")
-                    
-                    if division not in catch_file[species_code]:
-                        catch_file[species_code][division] = 0.0
+                    if division not in catch_file[common_name]:
+                        catch_file[common_name][division] = 0.0
+
                     # Add the catch of the cell to the catch file for the species  
-                    catch_file[species_code][division] += catch_value
+                    catch_file[common_name][division] += catch_value
 
             # Write an extra row to the catch_file.csv 
-            
-            sim.aggregated_catch_dictionary.clear()  # Reset the aggregated catch for the new year
-            sim.aggregated_biomass.clear()  # Reset the aggregated biomass for the new year
+
+            # Reset the aggregated dictionaries for the new year
+            sim.aggregated_catch_dictionary.clear()
+            sim.aggregated_biomass.clear()
 
         return workflow_pb2.SimulateStepResponse()
