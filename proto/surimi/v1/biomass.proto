@@ -15,3 +15,8 @@ message BiomassCell {// center of the cell
   double latitude = 2;
   double biomass = 3;
 }
+
+message BiomassSummary {
+  string measurement_unit = 1; // https://ucum.org/ucum
+  repeated BiomassGrid biomass_grids = 2;
+}
