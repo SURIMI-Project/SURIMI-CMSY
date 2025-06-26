@@ -8,7 +8,9 @@ option java_package = "eu.project.surimi";
 message CreateStockAssessmentRequest {
   string simulation_id = 1;
 }
-message CreateStockAssessmentResponse {}
+message CreateStockAssessmentResponse {
+  string simulation_id = 1;
+}
 
 service StockAssessmentService {
   rpc CreateStockAssessment(CreateStockAssessmentRequest) returns (CreateStockAssessmentResponse);

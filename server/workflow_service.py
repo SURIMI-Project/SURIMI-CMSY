@@ -1,5 +1,4 @@
 from datetime import datetime
-import os
 from dateutil.relativedelta import relativedelta
 import grpc
 from server.s3_storage import S3_Storage
@@ -18,7 +17,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         self.simulation_dictionary = simulation_dictionary  # Will hold the current simulation instance
         self.tracer = tracer  # Store the tracer instance
 
-    def Init(self, request, context):
+    def Initialise(self, request, context):
         if request.simulation_id in self.simulation_dictionary.keys():
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id already exists.")
 
@@ -56,33 +55,9 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         shutil.copy(src_dir / "ffnn.bin", output_directory / "ffnn.bin")
 
         self.simulation_dictionary[request.simulation_id] = simulation
-        return workflow_pb2.InitResponse()
-
-    def UpdateBiomass(self, request, context):
-        if request.simulation_id not in self.simulation_dictionary:
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
-
-        print(f"Update biomass for simulation {request.simulation_id} and measurement unit {request.measurement_unit}")
-        print(request)  # for debugging purposes
-
-        sim = self.simulation_dictionary[request.simulation_id]
-
-        # Loop over every grid in biomass_grids
-        for grid in request.biomass_grids:
-            # Check if the species is already in the aggregated_biomass
-            if grid.species_code not in sim.aggregated_biomass:
-                sim.aggregated_biomass[grid.species_code] = {}
-
-            # Loop over every cell in the grid
-            for cell in grid.biomass_cells:
-                cell_key = (cell.latitude, cell.longitude)
-                # Check if the cell is already in the aggregated_biomass for the species   
-                if cell_key not in sim.aggregated_biomass[grid.species_code]:
-                    sim.aggregated_biomass[grid.species_code][cell_key] = 0.0
-                # Add the biomass of the cell to the aggregated_biomass for the species  
-                sim.aggregated_biomass[grid.species_code][cell_key] += cell.biomass
-
-        return workflow_pb2.InitResponse()
+        return workflow_pb2.InitialiseResponse(
+            simulation_id=request.simulation_id
+        )
 
     # this method is called at the end of the month.
     def SimulateStep(self, request, context):
@@ -138,7 +113,29 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
             sim.aggregated_catch_dictionary.clear()
             sim.aggregated_biomass.clear()
 
-        return workflow_pb2.SimulateStepResponse()
+        return workflow_pb2.SimulateStepResponse(
+            simulation_id=request.simulation_id
+        )
+
+    def Finalise(self, request, context):
+        if request.simulation_id not in self.simulation_dictionary:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
+
+        # Todo: Add any finalisation logic here, such as cleaning up resources or saving state
+
+        return workflow_pb2.FinaliseResponse(
+            simulation_id=request.simulation_id
+        )
+
+    def Cancel(self, request, context):
+        if request.simulation_id not in self.simulation_dictionary:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
+
+        # Todo: Implement cancellation logic if needed, such as stopping ongoing processes or cleaning up resources
+
+        return workflow_pb2.FinaliseResponse(
+            simulation_id=request.simulation_id
+        )
 
     def _update_id_file(self, simulation_id: str, stocks: list[str], year: int):  # <-- NEW METHOD INSIDE CLASS
         import csv
