@@ -92,25 +92,21 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         sim = self.simulation_dictionary[request.simulation_id]
 
         if sim.step_size != "P1M":
-            # calculation of other step sizes is not implemented yet
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Only monthly steps are supported. Please set the step size to P1M.")
 
         print(f"SimulateStep for simulation {request.simulation_id}")
 
-        # Check if the year is complete
-        # if so, add the biomass of the species to the csv file
-
         current_year = sim.current_date_time.year
-        # Increment the current date time by one month
         sim.current_date_time += relativedelta(months=1)
 
         if current_year != sim.current_date_time.year:
             print(f"Year {current_year} is complete. Processing catch data.")
 
-            catch_file = {}
-            # catch_file is a dictionary that will hold the catch data for each species and division
+            # ✅ CATCH FILE PATH IS ONLY NEEDED INSIDE HERE
+            catch_file_path = Path(__file__).parent.parent.resolve() / "simulations" / request.simulation_id / "catch_file.csv"
 
-            # Loop over every species in the aggregated_catch_dictionary
+            catch_file = {}
+
             for species_code, cell_catches in sim.aggregated_catch_dictionary.items():
                 for cell_key, catch_value in cell_catches.items():
                     division = get_division(cell_key[0], cell_key[1])
@@ -123,13 +119,50 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
                     if division not in catch_file[common_name]:
                         catch_file[common_name][division] = 0.0
 
-                    # Add the catch of the cell to the catch file for the species  
                     catch_file[common_name][division] += catch_value
 
-            # Write an extra row to the catch_file.csv 
+            import csv
+            stock_names = []
 
-            # Reset the aggregated dictionaries for the new year
+            with open(catch_file_path, mode='a', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                for common_name, divisions in catch_file.items():
+                    for division, catch_value in divisions.items():
+                        stock_label = f"{common_name} - {division}"
+                        row = [stock_label, current_year, round(catch_value, 2), "NA"]
+                        writer.writerow(row)
+                        stock_names.append(stock_label)
+
+            self._update_id_file(request.simulation_id, stock_names, current_year)
+
             sim.aggregated_catch_dictionary.clear()
             sim.aggregated_biomass.clear()
 
         return workflow_pb2.SimulateStepResponse()
+
+    def _update_id_file(self, simulation_id: str, stocks: list[str], year: int):  # <-- NEW METHOD INSIDE CLASS
+        import csv
+
+        id_file_path = Path(__file__).parent.parent / "simulations" / simulation_id / "id_file.csv"
+
+        if not id_file_path.exists():
+            logger.error(f"id_file.csv not found for simulation {simulation_id}")
+            return
+
+        with open(id_file_path, newline='') as csvfile:
+            reader = list(csv.DictReader(csvfile))
+            fieldnames = reader[0].keys() if reader else []
+
+        updated_rows = []
+        for row in reader:
+            if row.get("Stock") in stocks:
+                row["MaxOfYear"] = str(year)
+                row["EndYear"] = str(year)
+            updated_rows.append(row)
+
+        with open(id_file_path, mode='w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(updated_rows)
+
+        print(f"✅ id_file.csv updated for year {year} and stocks: {stocks}")
