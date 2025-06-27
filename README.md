@@ -2,14 +2,31 @@
 This is the CMSY++ repo.
 It holds the source code of the SURIMI CMSY model
 
-After that, the 'proto' subdirectory will be filled with the contents of the SURIMI-protocol Git repo.
+## gRPC interface in Buf Schema Registry
+The gRPC interface is descibed by  protobuf files that are stored in https://github.com/Official-EwE/SURIMI-protocol
+So there are no proto files in the project!
 
-## How to re-generate the python proxy files from the protobuf files
+The proto files are also stored in  https://buf.build/surimi/surimi-protocol
 
-In the subdirectory \surimi\v1\ a collection of python files exist. These files are generated from the protobuf files of the proto submodule. Follow the procedure below to re-generate them when the protobuf files change.
+## Watch out! Check that you are using the SDK version v1.70.1!!
+You have to use version "v1.10.1" of the grpc/python SDK.
+More recent versions give trouble with the protobuf version in combination with Open Telemetry. But only when you create a docker image from it.
+
+To use the interface in this Python project you have to use the generated proxy files. These files are imported as a "pip" package.
+
+When you want to install a new version of the gRPC interface you go to https://buf.build/surimi/surimi-protocol/sdks/main:grpc/python?version=v1.70.1
+Copy the line, but without the "python3 -m " part and run in in a terminal.
+
+
+For example
 ```bash
-C:\Users\<user>\source\repos\SURIMI-CMSY> python -m grpc_tools.protoc -Iproto --python_out=. --grpc_python_out=. --pyi_out=. proto/surimi/v1/*.proto
+PS C:\Users\Rik\source\repos\SURIMI-CMSY> pip install surimi-surimi-protocol-grpc-python==1.70.1.1.20250626155734+d9c7c394022e --extra-index-url https://buf.build/gen/python
 ```
+
+The layout of the version number is explained in https://buf.build/docs/bsr/generated-sdks/python/?h=python#full-syntax
+
+
+Remember to also update the requirements file.txt.
 
 ## How to create a docker image, run it and push it
 
@@ -24,7 +41,7 @@ C:\Users\<user>\source\repos\SURIMI-CMSY>docker build -f Dockerfile . -t cmsy:la
 To run it, execute the following command. You can then connect Postman to http://localhost:12360 and send messages to the container
 
 ```bash
-C:\Users\<user>\source\repos\SURIMI-CMSY>docker run -p 12360:50201 cmsy:latest
+C:\Users\<user>\source\repos\SURIMI-CMSY>docker run -p 12360:5020 cmsy:latest
 ```
 
 ### Push
