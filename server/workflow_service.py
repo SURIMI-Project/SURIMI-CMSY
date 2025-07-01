@@ -97,7 +97,8 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
                     catch_file[common_name][division] += catch_value
 
             import csv
-            stock_names = []
+            sim.last_written_stock_names = []  # ✅ ADDED TO STORE STOCKS FOR FINALISE
+            sim.last_written_year = current_year  # ✅ ADDED TO STORE YEAR FOR FINALISE
 
             with open(catch_file_path, mode='a', newline='') as csvfile:
                 writer = csv.writer(csvfile)
@@ -106,9 +107,10 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
                         stock_label = f"{common_name} - {division}"
                         row = [stock_label, current_year, round(catch_value, 2), "NA"]
                         writer.writerow(row)
-                        stock_names.append(stock_label)
+                        sim.last_written_stock_names.append(stock_label)  # ✅ SAVE STOCK NAMES
 
-            self._update_id_file(request.simulation_id, stock_names, current_year)
+            # ✅ MOVED TO FINALISE:
+            # self._update_id_file(request.simulation_id, stock_names, current_year)
 
             sim.aggregated_catch_dictionary.clear()
             sim.aggregated_biomass.clear()
@@ -117,23 +119,34 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
             simulation_id=request.simulation_id
         )
 
-    def Finalise(self, request, context):
+    def Finalise(self, request, context):  # ✅ BRITISH SPELLING, POSITION MATCHES .PROTO
         if request.simulation_id not in self.simulation_dictionary:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
 
-        # Todo: Add any finalisation logic here, such as cleaning up resources or saving state
+        sim = self.simulation_dictionary[request.simulation_id]
+
+        # ✅ MOVED FROM SimulateStep
+        if hasattr(sim, "last_written_stock_names") and hasattr(sim, "last_written_year"):
+            self._update_id_file(
+                request.simulation_id,
+                sim.last_written_stock_names,
+                sim.last_written_year
+            )
+            print(f"✅ Finalise: id_file.csv updated for simulation {request.simulation_id}")
+        else:
+            print(f"⚠️ Finalise: No stock data found to update id_file.csv for {request.simulation_id}")
 
         return workflow_pb2.FinaliseResponse(
             simulation_id=request.simulation_id
         )
 
-    def Cancel(self, request, context):
+    def Cancel(self, request, context):  # ✅ NOW COMES AFTER FINALISE TO MATCH .PROTO
         if request.simulation_id not in self.simulation_dictionary:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
 
         # Todo: Implement cancellation logic if needed, such as stopping ongoing processes or cleaning up resources
 
-        return workflow_pb2.FinaliseResponse(
+        return workflow_pb2.CancelResponse(  # ✅ FIXED TO MATCH .PROTO
             simulation_id=request.simulation_id
         )
 
