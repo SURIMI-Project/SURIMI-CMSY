@@ -123,6 +123,8 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         if request.simulation_id not in self.simulation_dictionary:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
 
+        print(f"Finalise for simulation {request.simulation_id}")
+
         sim = self.simulation_dictionary[request.simulation_id]
 
         # ✅ MOVED FROM SimulateStep
@@ -143,6 +145,8 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
     def Cancel(self, request, context):  # ✅ NOW COMES AFTER FINALISE TO MATCH .PROTO
         if request.simulation_id not in self.simulation_dictionary:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
+
+        print(f"Cancel for simulation {request.simulation_id}")
 
         # Todo: Implement cancellation logic if needed, such as stopping ongoing processes or cleaning up resources
 
