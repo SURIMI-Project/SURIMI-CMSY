@@ -87,7 +87,7 @@ ENV PYTHONPATH=/app
 EXPOSE 50201
 
 # OpenTelemetry config
-ENV OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:18889
+ENV OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 ENV OTEL_SERVICE_NAME=cmsy
 
 # Run the server

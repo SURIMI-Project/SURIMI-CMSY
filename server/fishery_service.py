@@ -21,18 +21,18 @@ class FisheryService(fishery_pb2_grpc.FisheryServiceServicer):
         # Loop over every grid in Disposition_grids
         for grid in request.catch_disposition_summary.disposition_grids:
             # Check if the species is already in the aggregated_catch_dictionary
-            if grid.species_code not in sim.aggregated_catch_dictionary:
-                sim.aggregated_catch_dictionary[grid.species_code] = {}
+            if grid.species.species_code not in sim.aggregated_catch_dictionary:
+                sim.aggregated_catch_dictionary[grid.species.species_code] = {}
 
             # Loop over every cell in the grid
             for cell in grid.disposition_cells:
                 cell_key = (cell.latitude, cell.longitude)
                 # Check if the cell is already in the aggregated_catch_dictionary for the species   
-                if cell_key not in sim.aggregated_catch_dictionary[grid.species_code]:
-                    sim.aggregated_catch_dictionary[grid.species_code][cell_key] = 0.0
+                if cell_key not in sim.aggregated_catch_dictionary[grid.species.species_code]:
+                    sim.aggregated_catch_dictionary[grid.species.species_code][cell_key] = 0.0
                 
                 # Add the catch of the cell to the aggregated_catch_dictionary for the species  
-                sim.aggregated_catch_dictionary[grid.species_code][cell_key] += cell.gross_catch                    
+                sim.aggregated_catch_dictionary[grid.species.species_code][cell_key] += cell.gross_catch                    
 
 
         return fishery_pb2.UpdateCatchDispositionResponse(
