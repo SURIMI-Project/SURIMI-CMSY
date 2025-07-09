@@ -18,17 +18,17 @@ class EcologyService(ecology_pb2_grpc.EcologyServiceServicer):
         # Loop over every grid in biomass_grids
         for grid in request.biomass_summary.biomass_grids:
             # Check if the species is already in the aggregated_biomass
-            if grid.species_code not in sim.aggregated_biomass:
-                sim.aggregated_biomass[grid.species_code] = {}
+            if grid.species.species_code not in sim.aggregated_biomass:
+                sim.aggregated_biomass[grid.species.species_code] = {}
 
             # Loop over every cell in the grid
             for cell in grid.biomass_cells:
                 cell_key = (cell.latitude, cell.longitude)
                 # Check if the cell is already in the aggregated_biomass for the species   
-                if cell_key not in sim.aggregated_biomass[grid.species_code]:
-                    sim.aggregated_biomass[grid.species_code][cell_key] = 0.0
+                if cell_key not in sim.aggregated_biomass[grid.species.species_code]:
+                    sim.aggregated_biomass[grid.species.species_code][cell_key] = 0.0
                 # Add the biomass of the cell to the aggregated_biomass for the species  
-                sim.aggregated_biomass[grid.species_code][cell_key] += cell.biomass
+                sim.aggregated_biomass[grid.species.species_code][cell_key] += cell.biomass
 
         return ecology_pb2.UpdateBiomassResponse(
             simulation_id=request.simulation_id
