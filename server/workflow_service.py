@@ -9,6 +9,7 @@ import shutil
 from server.division_lookup import get_division
 from server.species_lookup import get_common_name
 import logging
+from opentelemetry import trace
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         self.tracer = tracer  # Store the tracer instance
 
     def Initialise(self, request, context):
+        trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id in self.simulation_dictionary.keys():
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id already exists.")
 
@@ -61,6 +63,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
 
     # this method is called at the end of the month.
     def SimulateStep(self, request, context):
+        trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
 
@@ -120,6 +123,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         )
 
     def Finalise(self, request, context):  # ✅ BRITISH SPELLING, POSITION MATCHES .PROTO
+        trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
 
@@ -143,6 +147,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         )
 
     def Cancel(self, request, context):  # ✅ NOW COMES AFTER FINALISE TO MATCH .PROTO
+        trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
 
