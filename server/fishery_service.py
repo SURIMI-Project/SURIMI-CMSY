@@ -1,5 +1,7 @@
 import grpc
 from surimi.v1 import fishery_pb2, fishery_pb2_grpc
+from opentelemetry import trace
+from common_functions import log_and_abort
 
 class FisheryService(fishery_pb2_grpc.FisheryServiceServicer):
     def __init__(self, tracer, simulation_dictionary):
@@ -7,8 +9,9 @@ class FisheryService(fishery_pb2_grpc.FisheryServiceServicer):
         self.tracer = tracer  # Store the tracer instance
 
     def UpdateCatchDisposition(self, request, context):
+        trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if not request.simulation_id in self.simulation_dictionary.keys():
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
 
         print(f"Update CatchDisposition for simulation {request.simulation_id} ")
 # Aggregate the catch data

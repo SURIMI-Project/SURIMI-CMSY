@@ -8,10 +8,8 @@ from pathlib import Path
 import shutil
 from server.division_lookup import get_division
 from server.species_lookup import get_common_name
-import logging
 from opentelemetry import trace
-
-logger = logging.getLogger(__name__)
+from common_functions import log_and_abort
 
 class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
     def __init__(self, tracer, simulation_dictionary):
@@ -21,11 +19,10 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
     def Initialise(self, request, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id in self.simulation_dictionary.keys():
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id already exists.")
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} already exists.")          
 
         if request.step_size != "P1M":
-            # calculation of other step sizes is not implemented yet
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Only monthly steps are supported. Please set the step size to P1M.")
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Error in simulation {request.simulation_id}: Only monthly steps are supported. Please set the step size to P1M.")
 
         simulation = Simulation(
             start_date_time=datetime.now(),
@@ -33,22 +30,17 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         )
         print(f"Init simulation {request.simulation_id} for scenario {request.scenario_id} with start date {request.start_date_time} and step size {request.step_size}")
 
-        # download the catch_file.csv, if_file.csv and AA_CMSY++.R from the S3 bucket to R_files
         S3_Storage.DownloadFilesFromS3("Surimi-cmsy/Config", "R_files")
 
-        # ✅ Create a directory named after the simulation_id inside ./simulations
         output_directory = Path(__file__).parent.parent.resolve() / Path("simulations") / request.simulation_id
         try:
-            # Creates the directory. parents=True makes sure "simulations/" is created if missing.
-            # exist_ok=False means it will fail if the folder already exists — avoids overwriting.
             output_directory.mkdir(parents=True, exist_ok=True)
             print(f"Created simulation directory: {output_directory}")
         except FileExistsError:
-            context.abort(grpc.StatusCode.ALREADY_EXISTS, f"Directory already exists: {output_directory}")
+            log_and_abort(context, grpc.StatusCode.ALREADY_EXISTS, f"Directory already exists: {output_directory}")
         except Exception as e:
-            context.abort(grpc.StatusCode.INTERNAL, f"Directory creation failed: {str(e)}")
+            log_and_abort(context, grpc.StatusCode.INTERNAL, f"Directory creation failed: {str(e)}")
 
-        # Copy catch_file.csv, if_file.csv and AA_CMSY++.R from R_files to output_directory
         src_dir = Path(__file__).parent.parent.resolve() / Path("R_files")
         print(f"Copying files from {src_dir} to {output_directory}")
         shutil.copy(src_dir / "catch_file.csv", output_directory / "catch_file.csv")
@@ -61,16 +53,15 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
             simulation_id=request.simulation_id
         )
 
-    # this method is called at the end of the month.
     def SimulateStep(self, request, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
 
         sim = self.simulation_dictionary[request.simulation_id]
 
         if sim.step_size != "P1M":
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Only monthly steps are supported. Please set the step size to P1M.")
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Error in simulation {request.simulation_id}: Only monthly steps are supported. Please set the step size to P1M.")
 
         print(f"SimulateStep for simulation {request.simulation_id}")
 
@@ -80,11 +71,40 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         if current_year != sim.current_date_time.year:
             print(f"Year {current_year} is complete. Processing catch data.")
 
-            # ✅ CATCH FILE PATH IS ONLY NEEDED INSIDE HERE
             catch_file_path = Path(__file__).parent.parent.resolve() / "simulations" / request.simulation_id / "catch_file.csv"
 
-            catch_file = {}
+            if not sim.aggregated_catch_dictionary:
+                print("⚠️ No aggregated catch data found. Writing NA entries to catch_file.csv")
+                id_file_path = Path(__file__).parent.parent / "simulations" / request.simulation_id / "id_file.csv"
+                try:
+                    import csv
+                    stock_names = []
+                    with open(id_file_path, newline='') as idfile:
+                        reader = csv.DictReader(idfile)
+                        for row in reader:
+                            stock = row.get("Stock")
+                            if stock and stock.strip():
+                                clean = stock.strip()
+                                print(f"📋 Adding stock row: '{clean}'")
+                                stock_names.append(clean)
+                    with open(catch_file_path, mode='a', newline='') as csvfile:
+                        import os
+                        writer = csv.writer(csvfile)
+                        count = 0
+                        for stock_name in stock_names:
+                            print(f"📝 Writing: [{stock_name}, {current_year}, NA, NA]")
+                            writer.writerow([stock_name, current_year, "NA", "NA"])
+                            count += 1
+                        csvfile.flush()
+                        os.fsync(csvfile.fileno())
+                        print(f"✅ Wrote {count} NA rows to {catch_file_path}")
+                except Exception as e:
+                    print(f"❌ Failed to write NA entries to catch_file.csv: {e}")
+                return workflow_pb2.SimulateStepResponse(
+                    simulation_id=request.simulation_id
+                )
 
+            catch_file = {}
             for species_code, cell_catches in sim.aggregated_catch_dictionary.items():
                 for cell_key, catch_value in cell_catches.items():
                     division = get_division(cell_key[0], cell_key[1])
@@ -100,8 +120,8 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
                     catch_file[common_name][division] += catch_value
 
             import csv
-            sim.last_written_stock_names = []  # ✅ ADDED TO STORE STOCKS FOR FINALISE
-            sim.last_written_year = current_year  # ✅ ADDED TO STORE YEAR FOR FINALISE
+            sim.last_written_stock_names = []
+            sim.last_written_year = current_year
 
             with open(catch_file_path, mode='a', newline='') as csvfile:
                 writer = csv.writer(csvfile)
@@ -110,28 +130,48 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
                         stock_label = f"{common_name} - {division}"
                         row = [stock_label, current_year, round(catch_value, 2), "NA"]
                         writer.writerow(row)
-                        sim.last_written_stock_names.append(stock_label)  # ✅ SAVE STOCK NAMES
+                        sim.last_written_stock_names.append(stock_label)
 
-            # ✅ MOVED TO FINALISE:
-            # self._update_id_file(request.simulation_id, stock_names, current_year)
+                        # ✅ PRINT ONLY NON-ZERO CATCHES TO TERMINAL
+                        if catch_value > 0:
+                            print(f"✅ {stock_label}: {round(catch_value, 2)} kg in {current_year}")
 
             sim.aggregated_catch_dictionary.clear()
             sim.aggregated_biomass.clear()
+
+            id_file_path = Path(__file__).parent.parent / "simulations" / request.simulation_id / "id_file.csv"
+            try:
+                with open(id_file_path, newline='') as idfile:
+                    reader = csv.DictReader(idfile)
+                    all_stocks = set(row.get("Stock", "").strip() for row in reader if row.get("Stock"))
+                written_stocks = set(sim.last_written_stock_names)
+                missing_stocks = all_stocks - written_stocks
+                if missing_stocks:
+                    print(f"➕ Appending NA rows for {len(missing_stocks)} stocks not written yet")
+                    with open(catch_file_path, mode='a', newline='') as csvfile:
+                        import os
+                        writer = csv.writer(csvfile)
+                        for stock_name in missing_stocks:
+                            writer.writerow([stock_name, current_year, "NA", "NA"])
+                        csvfile.flush()
+                        os.fsync(csvfile.fileno())
+                        print(f"✅ Appended {len(missing_stocks)} NA rows to {catch_file_path}")
+            except Exception as e:
+                print(f"❌ Failed to append missing NA rows: {e}")
 
         return workflow_pb2.SimulateStepResponse(
             simulation_id=request.simulation_id
         )
 
-    def Finalise(self, request, context):  # ✅ BRITISH SPELLING, POSITION MATCHES .PROTO
+    def Finalise(self, request, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
 
         print(f"Finalise for simulation {request.simulation_id}")
 
         sim = self.simulation_dictionary[request.simulation_id]
 
-        # ✅ MOVED FROM SimulateStep
         if hasattr(sim, "last_written_stock_names") and hasattr(sim, "last_written_year"):
             self._update_id_file(
                 request.simulation_id,
@@ -146,26 +186,24 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
             simulation_id=request.simulation_id
         )
 
-    def Cancel(self, request, context):  # ✅ NOW COMES AFTER FINALISE TO MATCH .PROTO
+    def Cancel(self, request, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
 
         print(f"Cancel for simulation {request.simulation_id}")
 
-        # Todo: Implement cancellation logic if needed, such as stopping ongoing processes or cleaning up resources
-
-        return workflow_pb2.CancelResponse(  # ✅ FIXED TO MATCH .PROTO
+        return workflow_pb2.CancelResponse(
             simulation_id=request.simulation_id
         )
 
-    def _update_id_file(self, simulation_id: str, stocks: list[str], year: int):  # <-- NEW METHOD INSIDE CLASS
+    def _update_id_file(self, simulation_id: str, stocks: list[str], year: int):
         import csv
 
         id_file_path = Path(__file__).parent.parent / "simulations" / simulation_id / "id_file.csv"
 
         if not id_file_path.exists():
-            logger.error(f"id_file.csv not found for simulation {simulation_id}")
+            print(f"id_file.csv not found for simulation {simulation_id}")
             return
 
         with open(id_file_path, newline='') as csvfile:

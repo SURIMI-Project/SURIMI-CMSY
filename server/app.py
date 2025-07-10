@@ -1,6 +1,5 @@
 import os
 from otlp_tracing import configure_oltp_grpc_tracing
-from logging_config import configure_logging  # Import the logging configuration function
 
 from concurrent import futures
 import grpc
@@ -12,13 +11,11 @@ from server.ecology_service import EcologyService
 from surimi.v1 import fishery_pb2_grpc, workflow_pb2_grpc, stock_assessment_pb2_grpc, ecology_pb2_grpc
 
 def serve():
-    # Configure logging
-#    logger = configure_logging()
     simulation_dictionary = {}
 
     otel_exporter_otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+    print(f"OpenTelemetry tracing configured. Sending to: {otel_exporter_otlp_endpoint}")
     tracer = configure_oltp_grpc_tracing( endpoint=otel_exporter_otlp_endpoint)  # Configure OpenTelemetry tracing
-#    logger.info(f"OpenTelemetry tracing configured. Sending to: {otel_exporter_otlp_endpoint}")
 
     print(f"AWS_ACCESS_KEY_ID: {os.environ.get('AWS_ACCESS_KEY_ID')}")
     print(f"AWS_SECRET_ACCESS_KEY: {os.environ.get('AWS_SECRET_ACCESS_KEY')}")

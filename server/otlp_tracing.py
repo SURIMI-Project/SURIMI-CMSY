@@ -18,22 +18,5 @@ def configure_oltp_grpc_tracing(endpoint: str = None) -> trace.Tracer:
     traceProvider.add_span_processor(processor)
     trace.set_tracer_provider(traceProvider)
 
-    # Configure Metrics
-    # reader = PeriodicExportingMetricReader(OTLPMetricExporter(endpoint=endpoint))
-    # meterProvider = MeterProvider(metric_readers=[reader])
-    # metrics.set_meter_provider(meterProvider)
-
-    # Configure Logging
-    # logger_provider = LoggerProvider()
-    # set_logger_provider(logger_provider)
-
-    # exporter = OTLPLogExporter(endpoint=endpoint)
-    # logger_provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
-    # handler = LoggingHandler(level=logging.NOTSET, logger_provider=logger_provider)
-    # handler.setFormatter(logging.Formatter("Python: %(message)s"))
-
-    # Attach OTLP handler to root logger
-    # logging.getLogger().addHandler(handler)
-
     tracer = trace.get_tracer(__name__)
     return tracer
