@@ -35,13 +35,13 @@ Create a docker image from the Dockerfile in the root of the repository. The ima
 Start Docker Desktop and make sure it is running. Then run the following command in the command line:
 
 ```bash
-C:\Users\<user>\source\repos\SURIMI-CMSY>docker build -f Dockerfile . -t cmsy:latest
+C:\Users\<user>\source\repos\SURIMI-CMSY>docker build -f Dockerfile . -t rikkert242/cmsy:latest
 ```
 ### Run
 To run it, execute the following command. You can then connect Postman to http://localhost:12360 and send messages to the container
 
 ```bash
-C:\Users\<user>\source\repos\SURIMI-CMSY>docker run -p 12360:5020 cmsy:latest
+C:\Users\<user>\source\repos\SURIMI-CMSY>docker run -p 5020:5020 rikkert242/cmsy:latest
 ```
 
 ### Push

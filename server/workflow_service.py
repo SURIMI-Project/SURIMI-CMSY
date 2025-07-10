@@ -8,9 +8,8 @@ from pathlib import Path
 import shutil
 from server.division_lookup import get_division
 from server.species_lookup import get_common_name
-import logging
-
-logger = logging.getLogger(__name__)
+from opentelemetry import trace
+from common_functions import log_and_abort
 
 class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
     def __init__(self, tracer, simulation_dictionary):
@@ -18,11 +17,12 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         self.tracer = tracer  # Store the tracer instance
 
     def Initialise(self, request, context):
+        trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id in self.simulation_dictionary.keys():
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id already exists.")
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} already exists.")          
 
         if request.step_size != "P1M":
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Only monthly steps are supported. Please set the step size to P1M.")
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Error in simulation {request.simulation_id}: Only monthly steps are supported. Please set the step size to P1M.")
 
         simulation = Simulation(
             start_date_time=datetime.now(),
@@ -37,9 +37,9 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
             output_directory.mkdir(parents=True, exist_ok=True)
             print(f"Created simulation directory: {output_directory}")
         except FileExistsError:
-            context.abort(grpc.StatusCode.ALREADY_EXISTS, f"Directory already exists: {output_directory}")
+            log_and_abort(context, grpc.StatusCode.ALREADY_EXISTS, f"Directory already exists: {output_directory}")
         except Exception as e:
-            context.abort(grpc.StatusCode.INTERNAL, f"Directory creation failed: {str(e)}")
+            log_and_abort(context, grpc.StatusCode.INTERNAL, f"Directory creation failed: {str(e)}")
 
         src_dir = Path(__file__).parent.parent.resolve() / Path("R_files")
         print(f"Copying files from {src_dir} to {output_directory}")
@@ -54,13 +54,14 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         )
 
     def SimulateStep(self, request, context):
+        trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
 
         sim = self.simulation_dictionary[request.simulation_id]
 
         if sim.step_size != "P1M":
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Only monthly steps are supported. Please set the step size to P1M.")
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Error in simulation {request.simulation_id}: Only monthly steps are supported. Please set the step size to P1M.")
 
         print(f"SimulateStep for simulation {request.simulation_id}")
 
@@ -98,7 +99,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
                         os.fsync(csvfile.fileno())
                         print(f"✅ Wrote {count} NA rows to {catch_file_path}")
                 except Exception as e:
-                    logger.error(f"❌ Failed to write NA entries to catch_file.csv: {e}")
+                    print(f"❌ Failed to write NA entries to catch_file.csv: {e}")
                 return workflow_pb2.SimulateStepResponse(
                     simulation_id=request.simulation_id
                 )
@@ -156,15 +157,16 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
                         os.fsync(csvfile.fileno())
                         print(f"✅ Appended {len(missing_stocks)} NA rows to {catch_file_path}")
             except Exception as e:
-                logger.error(f"❌ Failed to append missing NA rows: {e}")
+                print(f"❌ Failed to append missing NA rows: {e}")
 
         return workflow_pb2.SimulateStepResponse(
             simulation_id=request.simulation_id
         )
 
     def Finalise(self, request, context):
+        trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
 
         print(f"Finalise for simulation {request.simulation_id}")
 
@@ -185,8 +187,9 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         )
 
     def Cancel(self, request, context):
+        trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
-            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Simulation Id not known.")
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
 
         print(f"Cancel for simulation {request.simulation_id}")
 
@@ -200,7 +203,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         id_file_path = Path(__file__).parent.parent / "simulations" / simulation_id / "id_file.csv"
 
         if not id_file_path.exists():
-            logger.error(f"id_file.csv not found for simulation {simulation_id}")
+            print(f"id_file.csv not found for simulation {simulation_id}")
             return
 
         with open(id_file_path, newline='') as csvfile:

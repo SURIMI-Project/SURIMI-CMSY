@@ -90,5 +90,5 @@ EXPOSE 50201
 ENV OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 ENV OTEL_SERVICE_NAME=cmsy
 
-# Run the server
-CMD ["python", "server/app.py"]
+# Run the server -u option is used to ensure that output (logs) is flushed immediately
+CMD ["python", "-u", "server/app.py"]
