@@ -72,6 +72,9 @@ class S3_Storage:
                     # Skip directories
                     if s3_key.endswith('/'):
                         continue
+                    # Skip .keep files. They are used to keep empty directories in S3. (directories may not be empty in S3)
+                    if s3_key.endswith('.keep'):
+                        continue                    
                     # Compute local file path
                     relative_path = Path(s3_key).relative_to(source_directory)
                     local_path = Path(destination_directory) / relative_path
