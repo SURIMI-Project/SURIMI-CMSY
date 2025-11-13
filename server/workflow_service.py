@@ -2,7 +2,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import grpc
 from server.s3_storage import S3_Storage
-from server.simulation import Simulation
+from server.Simulation import Simulation
 from surimi.v1 import workflow_pb2, workflow_pb2_grpc
 from pathlib import Path
 import shutil
@@ -10,6 +10,8 @@ from server.division_lookup import get_division
 from server.species_lookup import get_common_name
 from opentelemetry import trace
 from common_functions import log_and_abort
+from r_scriptrunner import R_ScriptRunner
+
 
 class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
     def __init__(self, tracer, simulation_dictionary):
@@ -49,6 +51,13 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         shutil.copy(src_dir / "ffnn.bin", output_directory / "ffnn.bin")
 
         self.simulation_dictionary[request.simulation_id] = simulation
+
+        print(f"Create Stock Assessment for simulation {request.simulation_id} ")
+
+        # Run the R script. This messagehandler should be called by a client asynchonously and not awaited.
+        # In that case the R script will run in the background and the client will not wait for the result.
+        R_ScriptRunner.run_r_script_s3_upload("AA_CMSY++.R", request.simulation_id)
+
         return workflow_pb2.InitialiseResponse(
             simulation_id=request.simulation_id
         )
@@ -169,6 +178,9 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
 
         print(f"Finalise for simulation {request.simulation_id}")
+
+        print(f"Create Stock Assessment for simulation {request.simulation_id} ")
+        R_ScriptRunner.run_r_script_s3_upload("AA_CMSY++.R", request.simulation_id)
 
         sim = self.simulation_dictionary[request.simulation_id]
 
