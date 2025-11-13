@@ -6,7 +6,6 @@ import grpc
 from server.exception_metadata_interceptor import ExceptionMetadataInterceptor
 from server.fishery_service import FisheryService
 from server.workflow_service import WorkflowService
-from server.stock_assessment_service import StockAssessmentService
 from server.ecology_service import EcologyService 
 from surimi.v1 import fishery_pb2_grpc, workflow_pb2_grpc, stock_assessment_pb2_grpc, ecology_pb2_grpc
 
@@ -40,9 +39,6 @@ def serve():
 
     fishery_service = FisheryService(tracer, simulation_dictionary)  # Instantiate the fishery service
     fishery_pb2_grpc.add_FisheryServiceServicer_to_server(fishery_service, server)
-
-    stock_assessment_service = StockAssessmentService(tracer, simulation_dictionary)  # Instantiate the stock_assessment service
-    stock_assessment_pb2_grpc.add_StockAssessmentServiceServicer_to_server(stock_assessment_service, server)
 
     # Bind the server to a port
     server.add_insecure_port("[::]:5020")
