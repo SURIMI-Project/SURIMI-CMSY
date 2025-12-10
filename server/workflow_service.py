@@ -3,7 +3,7 @@ from dateutil.relativedelta import relativedelta
 import grpc
 from server.s3_storage import S3_Storage
 from server.Simulation import Simulation
-from surimi.v1 import workflow_pb2, workflow_pb2_grpc
+from surimi.v1 import workflow_service_pb2, workflow_service_pb2_grpc
 from pathlib import Path
 import shutil
 from server.division_lookup import get_division
@@ -13,7 +13,7 @@ from common_functions import log_and_abort
 from r_scriptrunner import R_ScriptRunner
 
 
-class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
+class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
     def __init__(self, tracer, simulation_dictionary):
         self.simulation_dictionary = simulation_dictionary  # Will hold the current simulation instance
         self.tracer = tracer  # Store the tracer instance
@@ -23,14 +23,14 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         if request.simulation_id in self.simulation_dictionary.keys():
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} already exists.")          
 
-        if request.step_size != "P1M":
+        if request.simulation.time_step != "P1M":
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Error in simulation {request.simulation_id}: Only monthly steps are supported. Please set the step size to P1M.")
-
+    
         simulation = Simulation(
             start_date_time=datetime.now(),
-            step_size=request.step_size,
+            step_size=request.simulation.time_step,
         )
-        print(f"Init simulation {request.simulation_id} for scenario {request.scenario_id} with start date {request.start_date_time} and step size {request.step_size}")
+        print(f"Init simulation {request.simulation_id} for scenario {request.scenario_id} with start date {request.simulation.start_date_time} and step size {request.simulation.time_step}")
 
         S3_Storage.DownloadFilesFromS3("Surimi-cmsy/Config", "R_files")
 
@@ -58,7 +58,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         # In that case the R script will run in the background and the client will not wait for the result.
         R_ScriptRunner.run_r_script_s3_upload("AA_CMSY++.R", request.simulation_id)
 
-        return workflow_pb2.InitialiseResponse(
+        return workflow_service_pb2.InitialiseResponse(
             simulation_id=request.simulation_id
         )
 
@@ -109,7 +109,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
                         print(f"✅ Wrote {count} NA rows to {catch_file_path}")
                 except Exception as e:
                     print(f"❌ Failed to write NA entries to catch_file.csv: {e}")
-                return workflow_pb2.SimulateStepResponse(
+                return workflow_service_pb2.SimulateStepResponse(
                     simulation_id=request.simulation_id
                 )
 
@@ -168,7 +168,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
             except Exception as e:
                 print(f"❌ Failed to append missing NA rows: {e}")
 
-        return workflow_pb2.SimulateStepResponse(
+        return workflow_service_pb2.SimulateStepResponse(
             simulation_id=request.simulation_id
         )
 
@@ -194,7 +194,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
         else:
             print(f"⚠️ Finalise: No stock data found to update id_file.csv for {request.simulation_id}")
 
-        return workflow_pb2.FinaliseResponse(
+        return workflow_service_pb2.FinaliseResponse(
             simulation_id=request.simulation_id
         )
 
@@ -205,7 +205,7 @@ class WorkflowService(workflow_pb2_grpc.WorkflowServiceServicer):
 
         print(f"Cancel for simulation {request.simulation_id}")
 
-        return workflow_pb2.CancelResponse(
+        return workflow_service_pb2.CancelResponse(
             simulation_id=request.simulation_id
         )
 

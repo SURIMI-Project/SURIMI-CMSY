@@ -1,9 +1,9 @@
 import grpc
-from surimi.v1 import ecology_pb2, ecology_pb2_grpc
+from surimi.v1 import ecology_service_pb2, ecology_service_pb2_grpc
 from opentelemetry import trace
 from common_functions import log_and_abort
 
-class EcologyService(ecology_pb2_grpc.EcologyServiceServicer):
+class EcologyService(ecology_service_pb2_grpc.EcologyServiceServicer):
     def __init__(self, tracer, simulation_dictionary):
         self.simulation_dictionary = simulation_dictionary  # Will hold the current simulation instance
         self.tracer = tracer  # Store the tracer instance
@@ -33,6 +33,6 @@ class EcologyService(ecology_pb2_grpc.EcologyServiceServicer):
                 # Add the biomass of the cell to the aggregated_biomass for the species  
                 sim.aggregated_biomass[grid.species.species_code][cell_key] += cell.biomass
 
-        return ecology_pb2.UpdateBiomassResponse(
+        return ecology_service_pb2.UpdateBiomassResponse(
             simulation_id=request.simulation_id
         )
