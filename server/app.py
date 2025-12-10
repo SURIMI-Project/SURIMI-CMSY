@@ -7,7 +7,7 @@ from server.exception_metadata_interceptor import ExceptionMetadataInterceptor
 from server.fishery_service import FisheryService
 from server.workflow_service import WorkflowService
 from server.ecology_service import EcologyService 
-from surimi.v1 import fishery_pb2_grpc, workflow_pb2_grpc, ecology_pb2_grpc
+from surimi.v1 import fishery_service_pb2_grpc, workflow_service_pb2_grpc, ecology_service_pb2_grpc
 
 def serve():
     simulation_dictionary = {}
@@ -32,13 +32,13 @@ def serve():
                          interceptors=[ExceptionMetadataInterceptor()])
     
     workflow_service = WorkflowService(tracer, simulation_dictionary)  # Instantiate the workflow service
-    workflow_pb2_grpc.add_WorkflowServiceServicer_to_server(workflow_service, server)
+    workflow_service_pb2_grpc.add_WorkflowServiceServicer_to_server(workflow_service, server)
 
     ecology_service = EcologyService(tracer, simulation_dictionary)  # Instantiate the ecology service
-    ecology_pb2_grpc.add_EcologyServiceServicer_to_server(ecology_service, server)
+    ecology_service_pb2_grpc.add_EcologyServiceServicer_to_server(ecology_service, server)
 
     fishery_service = FisheryService(tracer, simulation_dictionary)  # Instantiate the fishery service
-    fishery_pb2_grpc.add_FisheryServiceServicer_to_server(fishery_service, server)
+    fishery_service_pb2_grpc.add_FisheryServiceServicer_to_server(fishery_service, server)
 
     # Bind the server to a port
     server.add_insecure_port("[::]:5020")

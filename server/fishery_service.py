@@ -1,9 +1,9 @@
 import grpc
-from surimi.v1 import fishery_pb2, fishery_pb2_grpc
+from surimi.v1 import fishery_service_pb2, fishery_service_pb2_grpc
 from opentelemetry import trace
 from common_functions import log_and_abort
 
-class FisheryService(fishery_pb2_grpc.FisheryServiceServicer):
+class FisheryService(fishery_service_pb2_grpc.FisheryServiceServicer):
     def __init__(self, tracer, simulation_dictionary):
         self.simulation_dictionary = simulation_dictionary  # Will hold the current simulation instance
         self.tracer = tracer  # Store the tracer instance
@@ -38,7 +38,7 @@ class FisheryService(fishery_pb2_grpc.FisheryServiceServicer):
                 sim.aggregated_catch_dictionary[grid.species.species_code][cell_key] += cell.gross_catch                    
 
 
-        return fishery_pb2.UpdateCatchDispositionResponse(
+        return fishery_service_pb2.UpdateCatchDispositionResponse(
             simulation_id=request.simulation_id
         )
 
