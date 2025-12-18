@@ -27,9 +27,16 @@ def serve():
 
     print("Starting gRPC Server...")
 
-    # Create the server
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10),
-                         interceptors=[ExceptionMetadataInterceptor()])
+    # Create the server with 100MB message size limit
+    max_message_length = 100 * 1024 * 1024  # 100MB
+    server = grpc.server(
+        futures.ThreadPoolExecutor(max_workers=10),
+        interceptors=[ExceptionMetadataInterceptor()],
+        options=[
+            ('grpc.max_send_message_length', max_message_length),
+            ('grpc.max_receive_message_length', max_message_length),
+        ]
+    )
     
     workflow_service = WorkflowService(tracer, simulation_dictionary)  # Instantiate the workflow service
     workflow_service_pb2_grpc.add_WorkflowServiceServicer_to_server(workflow_service, server)

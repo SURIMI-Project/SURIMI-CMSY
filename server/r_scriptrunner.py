@@ -19,7 +19,7 @@ class R_ScriptRunner:
         os.chdir(directory)
 
         # Run the R script using subprocess
-        print(f"Start executing {script} using Rscript.")
+        print(f"Start executing {script} using Rscript. Please wait...")
         result = subprocess.run(
             ["Rscript", script],
             capture_output=True,
