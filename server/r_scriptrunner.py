@@ -33,6 +33,6 @@ class R_ScriptRunner:
 
         if result.returncode == 0:
             print("✅ CMSY++ completed.")
-            S3_Storage.UploadFilesToS3(os.path.dirname(script), f"Surimi-cmsy/Simulations/{simulation_id}")
+            S3_Storage.UploadFilesToS3(os.path.dirname(script), f"surimi-cmsy/Simulations/{simulation_id}")
         else:
             print(f"❌ CMSY++ failed with exit code {result.returncode}.")
