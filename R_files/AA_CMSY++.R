@@ -26,9 +26,16 @@ options(repos = c(CRAN = "https://cloud.r-project.org"))
 # install.packages("rjags",dependencies=T)
 
 # Automatic installation of missing packages
-list.of.packages <- c("R2jags","coda","parallel","foreach","doParallel","gplots","mvtnorm","snpar","neuralnet","conicfit","promises")
+list.of.packages <- c("R2jags","coda","parallel","foreach","doParallel","gplots","mvtnorm","neuralnet","conicfit","promises","tinytex")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
+
+# snpar is not available on CRAN anymore; install from GitHub if missing
+if (!("snpar" %in% installed.packages()[,"Package"])) {
+  if (!("remotes" %in% installed.packages()[,"Package"])) install.packages("remotes")
+  remotes::install_github("debinqiu/snpar", upgrade = "never")
+}
+
 library(R2jags)  # Interface with JAGS
 library(coda)
 library(gplots)
@@ -36,7 +43,7 @@ library(mvtnorm)
 library(snpar)
 library(neuralnet)
 library(conicfit)
-
+library(tinytex)
 
 #-----------------------------------------
 # Some general settings ----
