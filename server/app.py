@@ -8,6 +8,7 @@ from server.fishery_service import FisheryService
 from server.workflow_service import WorkflowService
 from server.ecology_service import EcologyService 
 from surimi.v1 import fishery_service_pb2_grpc, workflow_service_pb2_grpc, ecology_service_pb2_grpc
+import hvac
 
 def serve():
     simulation_dictionary = {}
@@ -24,6 +25,15 @@ def serve():
     print(f"AWS_BUCKET_NAME: {os.environ.get('AWS_BUCKET_NAME')}")
     print(f"OTEL_EXPORTER_OTLP_ENDPOINT: {os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")}")
 
+    client = hvac.Client(
+        url='https://vault.dive.edito.eu',
+        token='hvs.CAESINwJKfOC4kJd5Y9-I6uz-3kslkk2ho6rsJUIZdb2Es16Gh4KHGh2cy5oNTFmdFRkNTVGbzJHNDBMcmZrRkZ5SXI'
+    )
+
+    read_secret_result = client.secrets.kv.v1.read_secret(
+        path='data/rikkert/datalab_credentials',
+        mount_point='secret-kv'
+    )
 
     print("Starting gRPC Server...")
 
