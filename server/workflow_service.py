@@ -32,7 +32,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
         )
         print(f"Init simulation {request.simulation_id} for scenario {request.scenario_id} with start date {request.simulation.start_date_time} and step size {request.simulation.time_step}")
 
-        S3_Storage.DownloadFilesFromS3("surimi-cmsy/Config", "R_files")
+        S3_Storage.DownloadFilesFromS3("surimi-cmsy/config", "R_files")
 
         output_directory = Path(__file__).parent.parent.resolve() / Path("simulations") / request.simulation_id
         try:
