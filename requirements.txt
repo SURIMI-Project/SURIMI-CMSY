@@ -5,8 +5,10 @@ opentelemetry-sdk >= 1.33.0
 opentelemetry-exporter-otlp-proto-grpc >= 1.33.0
 opentelemetry-instrumentation-grpc >= 0.59b0
 protobuf>=6.33.2,<7.0.0
-surimi-surimi-protocol-grpc-python==1.70.1.1.20251209153647+db58a72669b7 
+surimi-surimi-protocol-grpc-python==1.70.1.1.20260209174634+e7a327e8e36f 
 --extra-index-url https://buf.build/gen/python
 python-dateutil
 boto3
 geopandas[all]
+hvac
+python-dotenv   # to load vault credentials from .env file. .env file is not in the repo, it should be created by the user with the necessary vault credentials.

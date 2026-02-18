@@ -7,4 +7,6 @@ class Simulation:
         self.current_date_time = start_date_time
         self.aggregated_biomass = {}
         self.aggregated_catch_dictionary = {}
+        self.last_written_stock_names = []
+        self.last_written_year = None
 

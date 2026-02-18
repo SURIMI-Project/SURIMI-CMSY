@@ -1,14 +1,15 @@
 import grpc
 from surimi.v1 import fishery_service_pb2, fishery_service_pb2_grpc
 from opentelemetry import trace
+from server.Simulation import Simulation
 from common_functions import log_and_abort
 
 class FisheryService(fishery_service_pb2_grpc.FisheryServiceServicer):
-    def __init__(self, tracer, simulation_dictionary):
+    def __init__(self, tracer, simulation_dictionary : dict[str, Simulation]):
         self.simulation_dictionary = simulation_dictionary  # Will hold the current simulation instance
         self.tracer = tracer  # Store the tracer instance
 
-    def UpdateCatchDisposition(self, request, context):
+    def UpdateCatchDisposition(self, request : fishery_service_pb2.UpdateCatchDispositionRequest, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if not request.simulation_id in self.simulation_dictionary.keys():
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
@@ -17,7 +18,7 @@ class FisheryService(fishery_service_pb2_grpc.FisheryServiceServicer):
 # Aggregate the catch data
 # Check if the year is complete
 # if so, add the catch of the species to the csv file
-        print(request)  # for debugging purposes
+        # print(request)  # for debugging purposes
 
         sim = self.simulation_dictionary[request.simulation_id]
 
@@ -37,8 +38,9 @@ class FisheryService(fishery_service_pb2_grpc.FisheryServiceServicer):
                 # Add the catch of the cell to the aggregated_catch_dictionary for the species  
                 sim.aggregated_catch_dictionary[grid.species.species_code][cell_key] += cell.gross_catch                    
 
-
         return fishery_service_pb2.UpdateCatchDispositionResponse(
-            simulation_id=request.simulation_id
+            simulation_id=request.simulation_id,
+            start_date_time=request.start_date_time,
+            end_date_time=request.end_date_time
         )
 

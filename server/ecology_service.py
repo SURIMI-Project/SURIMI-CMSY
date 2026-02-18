@@ -1,20 +1,21 @@
 import grpc
 from surimi.v1 import ecology_service_pb2, ecology_service_pb2_grpc
 from opentelemetry import trace
+from server.Simulation import Simulation
 from common_functions import log_and_abort
 
 class EcologyService(ecology_service_pb2_grpc.EcologyServiceServicer):
-    def __init__(self, tracer, simulation_dictionary):
+    def __init__(self, tracer, simulation_dictionary : dict[str, Simulation]):
         self.simulation_dictionary = simulation_dictionary  # Will hold the current simulation instance
         self.tracer = tracer  # Store the tracer instance
 
-    def UpdateBiomass(self, request, context):
+    def UpdateBiomass(self, request : ecology_service_pb2.UpdateBiomassRequest, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
 
         print(f"Update biomass for simulation {request.simulation_id}")
-        print(request)  # for debugging purposes
+        # print(request)  # for debugging purposes
 
         sim = self.simulation_dictionary[request.simulation_id]
 

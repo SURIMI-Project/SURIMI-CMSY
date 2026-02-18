@@ -14,11 +14,11 @@ from r_scriptrunner import R_ScriptRunner
 
 
 class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
-    def __init__(self, tracer, simulation_dictionary):
+    def __init__(self, tracer, simulation_dictionary : dict[str, Simulation]):
         self.simulation_dictionary = simulation_dictionary  # Will hold the current simulation instance
         self.tracer = tracer  # Store the tracer instance
 
-    def Initialise(self, request, context):
+    def Initialise(self, request : workflow_service_pb2.InitialiseRequest, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id in self.simulation_dictionary.keys():
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} already exists.")          
@@ -62,7 +62,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             simulation_id=request.simulation_id
         )
 
-    def SimulateStep(self, request, context):
+    def SimulateStep(self, request : workflow_service_pb2.SimulateStepRequest, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
@@ -72,7 +72,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
         if sim.step_size != "P1M":
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Error in simulation {request.simulation_id}: Only monthly steps are supported. Please set the step size to P1M.")
 
-        print(f"SimulateStep for simulation {request.simulation_id}")
+        print(f"SimulateStep for simulation {request.simulation_id} and date {sim.current_date_time}")
 
         current_year = sim.current_date_time.year
         sim.current_date_time += relativedelta(months=1)
@@ -118,7 +118,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
                 for cell_key, catch_value in cell_catches.items():
                     division = get_division(cell_key[0], cell_key[1])
                     common_name = get_common_name(species_code)
-                    print(f"📦 Catch for species {species_code} ({common_name}) in division {division}")
+                    # print(f"📦 Catch for species {species_code} ({common_name}) in division {division}")
 
                     if common_name not in catch_file:
                         catch_file[common_name] = {}
@@ -172,7 +172,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             simulation_id=request.simulation_id
         )
 
-    def Finalise(self, request, context):
+    def Finalise(self, request : workflow_service_pb2.FinaliseRequest, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
@@ -184,7 +184,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
 
         sim = self.simulation_dictionary[request.simulation_id]
 
-        if hasattr(sim, "last_written_stock_names") and hasattr(sim, "last_written_year"):
+        if sim.last_written_year is not None and sim.last_written_stock_names is not None:
             self._update_id_file(
                 request.simulation_id,
                 sim.last_written_stock_names,
@@ -198,7 +198,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             simulation_id=request.simulation_id
         )
 
-    def Cancel(self, request, context):
+    def Cancel(self, request : workflow_service_pb2.CancelRequest, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
