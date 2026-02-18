@@ -51,6 +51,33 @@ As an example the rikkert242/cmsy image is used. You can change this to your own
 C:\Users\<user>\source\repos\SURIMI-CMSY>docker push rikkert242/cmsy:latest
 ```
 
+## Virtual Environment
+When you work on this project, first create a Virtual Environment called ".venv".
+
+`python -m venv .venv`
+
+Then make sure it is activated!!!
+To check this, you can open the terminal.
+The environment is before the prompt:
+
+`(.venv) PS C:\Users\Rik\source\repos\SURIMI-CMSY>`
+This indicates that the ".venv" is active.
+
+When you see:
+`PS C:\Users\Rik\source\repos\SURIMI-CMSY>`
+Then it's not active!
+
+### Activate the .venv Virtual Environment
+Type:
+`PS C:\Users\Rik\source\repos\SURIMI-CMSY> .\.venv\Scripts\activate`
+
+### De-activate the .venv Virtual Environment
+Type
+`(.venv) PS C:\Users\Rik\source\repos\SURIMI-CMSY> deactivate`
+
+## .env file
+This file contains the environment variables that are used in the project. It is located in the root of the repository. The file is not included in the repository for security reasons. You have to create it yourself.
+
 
 # SURIMI
 
