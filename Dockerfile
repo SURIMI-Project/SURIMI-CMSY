@@ -84,7 +84,7 @@ COPY . /app
 ENV PYTHONPATH=/app
 
 # Expose server port
-EXPOSE 50201
+EXPOSE 5021
 
 # OpenTelemetry config
 ENV OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317

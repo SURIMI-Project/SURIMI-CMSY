@@ -1,15 +1,15 @@
 import grpc
-from surimi.v1 import ecology_service_pb2, ecology_service_pb2_grpc
+from surimi.v1 import ecology_consumer_service_pb2, ecology_consumer_service_pb2_grpc
 from opentelemetry import trace
 from server.Simulation import Simulation
 from common_functions import log_and_abort
 
-class EcologyService(ecology_service_pb2_grpc.EcologyServiceServicer):
+class EcologyConsumerService(ecology_consumer_service_pb2_grpc.EcologyConsumerServiceServicer):
     def __init__(self, tracer, simulation_dictionary : dict[str, Simulation]):
         self.simulation_dictionary = simulation_dictionary  # Will hold the current simulation instance
         self.tracer = tracer  # Store the tracer instance
 
-    def UpdateBiomass(self, request : ecology_service_pb2.UpdateBiomassRequest, context):
+    def UpdateBiomass(self, request : ecology_consumer_service_pb2.UpdateBiomassRequest, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
@@ -34,6 +34,6 @@ class EcologyService(ecology_service_pb2_grpc.EcologyServiceServicer):
                 # Add the biomass of the cell to the aggregated_biomass for the species  
                 sim.aggregated_biomass[grid.species.species_code][cell_key] += cell.biomass
 
-        return ecology_service_pb2.UpdateBiomassResponse(
+        return ecology_consumer_service_pb2.UpdateBiomassResponse(
             simulation_id=request.simulation_id
         )

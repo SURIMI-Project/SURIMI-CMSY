@@ -4,10 +4,10 @@ import grpc
 from otlp_tracing import configure_oltp_grpc_tracing
 from concurrent import futures
 from server.exception_metadata_interceptor import ExceptionMetadataInterceptor
-from server.fishery_service import FisheryService
+from server.catch_consumer_service import CatchConsumerService
 from server.workflow_service import WorkflowService
-from server.ecology_service import EcologyService 
-from surimi.v1 import fishery_service_pb2_grpc, workflow_service_pb2_grpc, ecology_service_pb2_grpc
+from server.ecology_consumer_service import EcologyConsumerService 
+from surimi.v1 import catch_consumer_service_pb2_grpc, workflow_service_pb2_grpc, ecology_consumer_service_pb2_grpc
 from vault_service import VaultService
 from dotenv import load_dotenv
 
@@ -47,16 +47,16 @@ def serve():
     workflow_service = WorkflowService(tracer, simulation_dictionary)  # Instantiate the workflow service
     workflow_service_pb2_grpc.add_WorkflowServiceServicer_to_server(workflow_service, server)
 
-    ecology_service = EcologyService(tracer, simulation_dictionary)  # Instantiate the ecology service
-    ecology_service_pb2_grpc.add_EcologyServiceServicer_to_server(ecology_service, server)
+    ecology_consumer_service = EcologyConsumerService(tracer, simulation_dictionary)  # Instantiate the ecology service
+    ecology_consumer_service_pb2_grpc.add_EcologyConsumerServiceServicer_to_server(ecology_consumer_service, server)
 
-    fishery_service = FisheryService(tracer, simulation_dictionary)  # Instantiate the fishery service
-    fishery_service_pb2_grpc.add_FisheryServiceServicer_to_server(fishery_service, server)
+    catch_consumer_service = CatchConsumerService(tracer, simulation_dictionary)  # Instantiate the catch consumer service
+    catch_consumer_service_pb2_grpc.add_CatchConsumerServiceServicer_to_server(catch_consumer_service, server)
 
     # Bind the server to a port
-    server.add_insecure_port("[::]:5020")
+    server.add_insecure_port("[::]:5021")
     server.start()
-    print("[OK] gRPC Server running on port 5020")
+    print("[OK] gRPC Server running on port 5021")
 
     # Wait for the server to stop
     try:
