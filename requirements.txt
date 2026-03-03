@@ -1,11 +1,10 @@
 grpcio
-grpc-interceptor == 0.15.4
-opentelemetry-api >= 1.33.0
-opentelemetry-sdk >= 1.33.0
-opentelemetry-exporter-otlp-proto-grpc >= 1.33.0
-opentelemetry-instrumentation-grpc >= 0.59b0
-protobuf>=6.33.2,<7.0.0
-surimi-surimi-protocol-grpc-python==1.70.1.1.20260209174634+e7a327e8e36f 
+grpc-interceptor
+opentelemetry-api==1.39.1
+opentelemetry-sdk==1.39.1
+opentelemetry-instrumentation-grpc
+protobuf>=7.34.0
+surimi-surimi-protocol-grpc-python==1.70.1.1.20260226153619+0d61650ba044 
 --extra-index-url https://buf.build/gen/python
 python-dateutil
 boto3

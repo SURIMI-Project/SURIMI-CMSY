@@ -41,7 +41,7 @@ C:\Users\<user>\source\repos\SURIMI-CMSY>docker build -f Dockerfile . -t rikkert
 To run it, execute the following command. You can then connect Postman to http://localhost:12360 and send messages to the container
 
 ```bash
-C:\Users\<user>\source\repos\SURIMI-CMSY>docker run -p 5020:5020 rikkert242/cmsy:latest
+C:\Users\<user>\source\repos\SURIMI-CMSY>docker run -p 5021:5021 rikkert242/cmsy:latest
 ```
 
 ### Push
