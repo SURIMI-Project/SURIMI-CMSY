@@ -37,6 +37,8 @@ Start Docker Desktop and make sure it is running. Then run the following command
 ```bash
 C:\Users\<user>\source\repos\SURIMI-CMSY>docker build -f Dockerfile . -t rikkert242/cmsy:latest
 ```
+
+Achtung: Sometimes this may take 50 minutes!!!!
 ### Run
 To run it, execute the following command. You can then connect Postman to http://localhost:12360 and send messages to the container
 
@@ -74,6 +76,11 @@ Type:
 ### De-activate the .venv Virtual Environment
 Type
 `(.venv) PS C:\Users\Rik\source\repos\SURIMI-CMSY> deactivate`
+
+### Reload all packages from the requirements.txt
+Type
+`(.venv) PS C:\Users\Rik\source\repos\SURIMI-CMSY> if (Test-Path .venv) { Remove-Item -Recurse -Force .venv }; py -m venv .venv; .\.venv\Scripts\python.exe -m pip install -r requirements.txt`
+
 
 ## .env file
 This file contains the environment variables that are used in the project. It is located in the root of the repository. The file is not included in the repository for security reasons. You have to create it yourself.
