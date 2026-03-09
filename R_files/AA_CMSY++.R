@@ -62,18 +62,16 @@ n.chains     <- 2 # number of chains to be used in JAGS, default = 2
 catch_file  <- "catch_file.csv" #"Stocks_Catch_2020CMSYrun2_v5_RS - Copy.csv"  #"CombStocks_Catch_2020CMSYrun3_v4.csv"  # "SAUP_Catch_1.csv"  #"SimCatchCPUE_4.csv"  # "Stocks_Catch_Aust_2.csv" #"STECF_Catch_2020_2.csv" #"tRFMO_Catch_2020.csv" #"ICES_Catch_2020.csv" #"Global_Stocks_Catch.csv" #"SimCatchCPUE_4.csv" #"Stocks_Catch_Test.csv"  #"Stock_Catch_forRainer.csv" # "SimCatchCPUE_3.csv" #  name of file containing "Stock", "yr", "ct", and optional "bt"
 id_file     <- "id_file.csv" #"Stocks_ID_forDeng_RSb - Copy.csv" # "CombStocks_ID_2020CMSYrun3_v3_RF3.csv"   #    "SAUP_ID_2.csv"    #"SimSpecCPUE_4_NA_int_end.csv"  #"Train_ID_7j.csv" # "Stocks_ID_Aust_4.csv"  #"STECF_ID_2020_2.csv" #tRFMO_ID_2020_2.csv" #"ICES_ID_2020_4.csv" #"Robust_Stocks_ID_10_allNA.csv" #"SimSpecCPUE_4.csv"#"Stocks_ID_R_7.csv"  #"Stock_ID_forRainer.csv"  #  "NCod_ID_4.csv" #"SimSpecCPUE_3.csv" #  name of file containing stock-specific info and settings for the analysis
 nn_file     <-  "ffnn.bin" # file containing neural networks trained to estimate B/k priors
-outfile     <- paste("Out_South_Med_",format(Sys.Date(),format="%B%d%Y_"),id_file,sep="") # default name for output file
+outfile     <- paste("West_Med_",format(Sys.Date(),format="%B%d%Y_"),id_file,sep="") # default name for output file
 
 
 #----------------------------------------
 # Select stock to be analyzed ----
 #----------------------------------------
-#stocks      <- NA
+stocks      <- NA
 # If the input files contain more than one stock, specify below the stock to be analyzed
 # If the line below is commented out (#), all stocks in the input file will be analyzed
-stocks <- "Hogfish - Florida Keys / East Florida"  
-
-#"Blacknose shark - Atlantic"  #"Acadian redfish - Gulf of Maine / Georges Bank"# "Splitnose rockfish - Pacific Coast"  #"Acadian_redfish"  # "ple.27.7d" #"cod.27.1-2coast"#"cod.27.7e-k" # "Acadian redfish - Gulf of Maine / Georges Bank"  #c("Greenspotted rockfish - Pacific Coast")
+# stocks <- "HKE"
 #-----------------------------------------
 # General settings for the analysis ----
 #-----------------------------------------
@@ -469,21 +467,72 @@ for(stock in stocks) {
     ct.3         <- mean(ct[1:3])
     max.ct       <- max(ct)
 
-    if(btype=="biomass" | btype=="CPUE" ) {
-      bt.raw1 <- as.numeric(cdat$bt[cdat$Stock==stock & cdat$yr >= start.yr & cdat$yr <= end.yr])
-      # if bt.raw is zero, change to NA
-      bt.raw1[bt.raw1==0] <- NA
-      if(btype=="biomass") { # make sure both catch and biomass are divided by 1000
-        bt <- bt.raw1/1000 } else { # get number of integer digits for bt.raw (because sometimes they give numbers of eggs!)
-          bt.digits <- floor(log10(mean(bt.raw1,na.rm=T)))+1
-          if(bt.digits>3) {bt.raw <- bt.raw1/10^(bt.digits-1)} else {bt.raw <- bt.raw1}
-          bt     <- bt.raw #ksmooth(x=yr,y=bt.raw,kernel="normal",n.points=length(yr),bandwidth=3)$y
-        } # end of bt==CPUE loop
-      if(length(bt[is.na(bt)==F])==0) {
-        cat("ERROR: No CPUE or biomass data in the Catch input file")
-        return (NA) }
-    } else {bt <- NA; bt.raw <- NA} # if there is no biomass or CPUE, set bt to NA
+#    if(btype=="biomass" | btype=="CPUE" ) {
+#      bt.raw1 <- as.numeric(cdat$bt[cdat$Stock==stock & cdat$yr >= start.yr & cdat$yr <= end.yr])
+#      # if bt.raw is zero, change to NA
+#      bt.raw1[bt.raw1==0] <- NA
+#      if(btype=="biomass") { # make sure both catch and biomass are divided by 1000
+#        bt <- bt.raw1/1000 } else { # get number of integer digits for bt.raw (because sometimes they give numbers of eggs!)
+#          bt.digits <- floor(log10(mean(bt.raw1,na.rm=T)))+1
+#          if(bt.digits>3) {bt.raw <- bt.raw1/10^(bt.digits-1)} else {bt.raw <- bt.raw1}
+#          bt     <- bt.raw #ksmooth(x=yr,y=bt.raw,kernel="normal",n.points=length(yr),bandwidth=3)$y
+#        } # end of bt==CPUE loop
+#      if(length(bt[is.na(bt)==F])==0) {
+#        cat("ERROR: No CPUE or biomass data in the Catch input file")
+#        return (NA) }
+#    } else {bt <- NA; bt.raw <- NA} # if there is no biomass or CPUE, set bt to NA
 
+if (btype == "biomass" | btype == "CPUE") {
+
+  bt.raw1 <- as.numeric(cdat$bt[cdat$Stock == stock & cdat$yr >= start.yr & cdat$yr <= end.yr])
+
+  # if bt.raw is zero, change to NA
+  bt.raw1[bt.raw1 == 0] <- NA
+
+  if (btype == "biomass") {
+
+    # make sure both catch and biomass are divided by 1000
+    bt <- bt.raw1 / 1000
+    bt.raw <- bt.raw1
+
+  } else {
+
+    # get number of integer digits for bt.raw (because sometimes they give numbers of eggs!)
+    # FIX: avoid bt.digits becoming NA/NaN when bt.raw1 is all NA or mean is not positive
+    if (length(bt.raw1[is.na(bt.raw1) == FALSE]) == 0) {
+      bt <- NA
+      bt.raw <- NA
+    } else {
+      bt.mean <- mean(bt.raw1, na.rm = TRUE)
+
+      if (is.na(bt.mean) || is.nan(bt.mean) || bt.mean <= 0) {
+        bt.digits <- 3
+      } else {
+        bt.digits <- floor(log10(bt.mean)) + 1
+        if (is.na(bt.digits) || is.nan(bt.digits) || is.infinite(bt.digits)) bt.digits <- 3
+      }
+
+      if (bt.digits > 3) {
+        bt.raw <- bt.raw1 / 10^(bt.digits - 1)
+      } else {
+        bt.raw <- bt.raw1
+      }
+
+      bt <- bt.raw # ksmooth(x=yr,y=bt.raw,kernel="normal",n.points=length(yr),bandwidth=3)$y
+    }
+  } # end of bt==CPUE loop
+
+  # FIX: do not abort; continue with bt as NA (catch-only path downstream)
+  if (length(bt[is.na(bt) == FALSE]) == 0) {
+    cat("WARNING: No CPUE or biomass data in the Catch input file for stock:", stock, "- continuing without bt\n")
+    bt <- NA
+    bt.raw <- NA
+  }
+
+} else {
+  bt <- NA
+  bt.raw <- NA
+} # if there is no biomass or CPUE, set bt to NA
 
     # code to change start year to avoid ambiguity in biomass prior -----------------------------------------
     start.yr.new <- NA # initialize / reset start.yr.new with NA
@@ -902,7 +951,7 @@ plot(x=yr, y=ct.raw,
      ylim=c(0,max(ifelse(substr(id_file,1,3)=="Sim",
                          1.1*true.MSY,0),1.2*max(ct.raw))),
      type ="l", bty="l", main=paste("A:",gsub(":","",gsub("/","-",stock))),
-     xlab="", ylab="Catch (1000 tonnes/year)",
+     xlab="", ylab="Catch (tonnes/year)",
      lwd=2, cex.main = 1.5, cex.lab = 1.55, cex.axis = 1.5)
 lines(x=yr, y=ct, col="blue", lwd=1)
 points(x=yr[max.yr.i], y=max.ct, col="red", lwd=2)
@@ -2252,6 +2301,7 @@ if (kobe.plot == TRUE) {
     write.table(output, file=outfile, append = T, sep = ",",
                 dec = ".", row.names = FALSE, col.names = FALSE)
   }
+
 
   #----------------------------------------------------------------------------------
   # The code below creates a report in PDF format if write.pdf is TRUE ----

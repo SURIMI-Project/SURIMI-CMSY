@@ -14,23 +14,33 @@ from r_scriptrunner import R_ScriptRunner
 
 
 class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
-    def __init__(self, tracer, simulation_dictionary : dict[str, Simulation]):
+    def __init__(self, tracer, simulation_dictionary: dict[str, Simulation]):
         self.simulation_dictionary = simulation_dictionary  # Will hold the current simulation instance
         self.tracer = tracer  # Store the tracer instance
 
-    def Initialise(self, request : workflow_service_pb2.InitialiseRequest, context):
+    def Initialise(self, request: workflow_service_pb2.InitialiseRequest, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
+        print("InitialiseRequest fields:", [f.name for f in request.DESCRIPTOR.fields])
+        print("✅ CONTRACT FILTERING ENABLED (WORKFLOW_SERVICE.PY UPDATED)")
+
         if request.simulation_id in self.simulation_dictionary.keys():
-            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} already exists.")          
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} already exists.")
 
         if request.simulation.time_step != "P1M":
-            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Error in simulation {request.simulation_id}: Only monthly steps are supported. Please set the step size to P1M.")
-    
+            log_and_abort(
+                context,
+                grpc.StatusCode.INVALID_ARGUMENT,
+                f"Error in simulation {request.simulation_id}: Only monthly steps are supported. Please set the step size to P1M."
+            )
+
         simulation = Simulation(
             start_date_time=datetime.now(),
             step_size=request.simulation.time_step,
         )
-        print(f"Init simulation {request.simulation_id} for scenario {request.scenario_id} with start date {request.simulation.start_date_time} and step size {request.simulation.time_step}")
+        print(
+            f"Init simulation {request.simulation_id} for scenario {request.scenario_id} "
+            f"with start date {request.simulation.start_date_time} and step size {request.simulation.time_step}"
+        )
 
         S3_Storage.DownloadFilesFromS3("surimi-cmsy/config", "R_files")
 
@@ -50,6 +60,116 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
         shutil.copy(src_dir / "AA_CMSY++.R", output_directory / "AA_CMSY++.R")
         shutil.copy(src_dir / "ffnn.bin", output_directory / "ffnn.bin")
 
+        # =============================
+        # CONTRACT SPECIES FILTERING (RUN ONLY CONTRACT SPECIES; THROW EVERYTHING ELSE)
+        # - CONTRACT SPECIES COME FROM INIT MESSAGE: request.simulation.items.species[*].species_code
+        # - KEEP ONLY CONTRACT SPECIES IN catch_file.csv AND id_file.csv
+        # - IF CONTRACT SPECIES ARE MISSING FROM FILES: CONTINUE (PRINT WARNING)
+        # =============================
+        import csv
+
+        contract_codes = {
+            s.species_code.strip()
+            for s in request.simulation.items.species
+            if getattr(s, "species_code", "").strip()
+        }
+
+        if not contract_codes:
+            log_and_abort(
+                context,
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "Initialise request contains no species codes in simulation.items.species."
+            )
+
+        catch_file_path = output_directory / "catch_file.csv"
+        id_file_path = output_directory / "id_file.csv"
+
+        print(f"✅ Contract species ({len(contract_codes)}): {', '.join(sorted(contract_codes))}")
+
+        # ---- FILTER id_file.csv (Stock column is FAO 3-alpha)
+        with open(id_file_path, newline="") as f:
+            reader = csv.DictReader(f)
+            if not reader.fieldnames or "Stock" not in reader.fieldnames:
+                log_and_abort(
+                    context,
+                    grpc.StatusCode.INVALID_ARGUMENT,
+                    f"id_file.csv must contain a 'Stock' column. Found columns: {reader.fieldnames}"
+                )
+            id_rows = list(reader)
+            id_fieldnames = reader.fieldnames
+
+        id_filtered_rows = []
+        present_id = set()
+        for r in id_rows:
+            stock = (r.get("Stock") or "").strip()
+            if stock in contract_codes:
+                id_filtered_rows.append(r)
+                present_id.add(stock)
+
+        removed_id = len(id_rows) - len(id_filtered_rows)
+
+        with open(id_file_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=id_fieldnames)
+            writer.writeheader()
+            writer.writerows(id_filtered_rows)
+
+        print(f"🧹 id_file.csv filtered to contract species (removed {removed_id} non-contract stocks).")
+
+        # ---- FILTER catch_file.csv (first column is Stock)
+        # NOTE: we KEEP HEADER if present; we FILTER DATA ROWS by contract_codes
+        with open(catch_file_path, newline="") as f:
+            all_catch_rows = [row for row in csv.reader(f) if row]
+
+        filtered_catch_rows = []
+        present_catch = set()
+
+        original_data_rows = 0
+        kept_data_rows = 0
+
+        for row in all_catch_rows:
+            stock = (row[0] or "").strip()
+
+            if stock.lower() == "stock":  # header
+                filtered_catch_rows.append(row)
+                continue
+
+            original_data_rows += 1
+
+            if stock in contract_codes:
+                filtered_catch_rows.append(row)
+                present_catch.add(stock)
+                kept_data_rows += 1
+
+        removed_catch = original_data_rows - kept_data_rows
+
+        with open(catch_file_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerows(filtered_catch_rows)
+
+        print(f"🧹 catch_file.csv filtered to contract species (removed {removed_catch} non-contract rows).")
+
+        # ---- WARN ABOUT MISSING CONTRACT SPECIES (DO NOT ABORT)
+        missing_in_id = sorted(contract_codes - present_id)
+        missing_in_catch = sorted(contract_codes - present_catch)
+
+        if missing_in_id:
+            print(f"⚠️ Contract species missing from id_file.csv (continuing): {', '.join(missing_in_id)}")
+        if missing_in_catch:
+            print(f"⚠️ Contract species missing from catch_file.csv (continuing): {', '.join(missing_in_catch)}")
+
+        # NOTE: The effective species that will run (present in BOTH filtered files)
+        effective_species = sorted((present_id & present_catch) & contract_codes)
+        print(f"✅ Effective species to run (present in both files): {len(effective_species)}")
+
+        # OPTIONAL: quick sanity peek (first few stocks)
+        try:
+            with open(id_file_path, newline="") as f:
+                rdr = csv.DictReader(f)
+                preview = [row["Stock"] for _, row in zip(range(10), rdr)]
+            print(f"DEBUG: First id_file stocks: {preview}")
+        except Exception as e:
+            print(f"DEBUG: Could not preview id_file.csv: {e}")
+
         self.simulation_dictionary[request.simulation_id] = simulation
 
         print(f"Create Stock Assessment for simulation {request.simulation_id} ")
@@ -62,7 +182,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             simulation_id=request.simulation_id
         )
 
-    def SimulateStep(self, request : workflow_service_pb2.SimulateStepRequest, context):
+    def SimulateStep(self, request: workflow_service_pb2.SimulateStepRequest, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
@@ -118,7 +238,6 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
                 for cell_key, catch_value in cell_catches.items():
                     division = get_division(cell_key[0], cell_key[1])
                     common_name = get_common_name(species_code)
-                    # print(f"📦 Catch for species {species_code} ({common_name}) in division {division}")
 
                     if common_name not in catch_file:
                         catch_file[common_name] = {}
@@ -141,7 +260,6 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
                         writer.writerow(row)
                         sim.last_written_stock_names.append(stock_label)
 
-                        # ✅ PRINT ONLY NON-ZERO CATCHES TO TERMINAL
                         if catch_value > 0:
                             print(f"✅ {stock_label}: {round(catch_value, 2)} kg in {current_year}")
 
@@ -172,7 +290,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             simulation_id=request.simulation_id
         )
 
-    def Finalise(self, request : workflow_service_pb2.FinaliseRequest, context):
+    def Finalise(self, request: workflow_service_pb2.FinaliseRequest, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
@@ -198,7 +316,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             simulation_id=request.simulation_id
         )
 
-    def Cancel(self, request : workflow_service_pb2.CancelRequest, context):
+    def Cancel(self, request: workflow_service_pb2.CancelRequest, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
         if request.simulation_id not in self.simulation_dictionary:
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
