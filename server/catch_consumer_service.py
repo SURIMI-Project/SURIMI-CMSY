@@ -39,8 +39,6 @@ class CatchConsumerService(catch_consumer_service_pb2_grpc.CatchConsumerServiceS
                 sim.aggregated_catch_dictionary[grid.species.species_code][cell_key] += cell.gross_catch                    
 
         return catch_consumer_service_pb2.UpdateCatchDispositionResponse(
-            simulation_id=request.simulation_id,
-            start_date_time=request.start_date_time,
-            end_date_time=request.end_date_time
+            simulation_id=request.simulation_id
         )
 
