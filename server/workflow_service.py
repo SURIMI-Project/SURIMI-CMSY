@@ -35,7 +35,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             )
 
         simulation = Simulation(
-            start_date_time=datetime.now(),
+            start_date_time=request.simulation.start_date_time.ToDatetime().replace(tzinfo=None),
             step_size=request.simulation.time_step,
         )
         print(
