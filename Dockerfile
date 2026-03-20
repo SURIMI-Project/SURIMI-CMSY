@@ -64,9 +64,9 @@ ENV LD_LIBRARY_PATH=/usr/local/lib
 # Install R packages that depend on JAGS
 RUN Rscript -e "install.packages(c('rjags', 'R2jags', 'stringr'), repos='https://cloud.r-project.org')"
 
-# Install devtools and snpar from GitHub
-RUN Rscript -e "install.packages('devtools', repos='https://cloud.r-project.org')" \
-    && Rscript -e "devtools::install_github('debinqiu/snpar')"
+# Install snpar from GitHub
+RUN Rscript -e "install.packages('remotes', repos='https://cloud.r-project.org')" \
+    && Rscript -e "remotes::install_github('debinqiu/snpar')"
 
 # Set the working directory inside the container
 WORKDIR /app

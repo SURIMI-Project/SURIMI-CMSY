@@ -14,9 +14,10 @@ from r_scriptrunner import R_ScriptRunner
 
 
 class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
-    def __init__(self, tracer, simulation_dictionary: dict[str, Simulation]):
+    def __init__(self, tracer, simulation_dictionary: dict[str, Simulation], version: str):
         self.simulation_dictionary = simulation_dictionary  # Will hold the current simulation instance
         self.tracer = tracer  # Store the tracer instance
+        self.version = version  # Store the version
 
     def Initialise(self, request: workflow_service_pb2.InitialiseRequest, context):
         trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
@@ -353,3 +354,8 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             writer.writerows(updated_rows)
 
         print(f"✅ id_file.csv updated for year {year} and stocks: {stocks}")
+
+    def GetProtocolVersion(self, request: workflow_service_pb2.GetProtocolVersionRequest, context: grpc.ServicerContext):
+        return workflow_service_pb2.GetProtocolVersionResponse(
+            protocol_version = self.version 
+        )
