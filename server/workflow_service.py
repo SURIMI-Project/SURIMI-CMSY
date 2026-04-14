@@ -9,9 +9,9 @@ import shutil
 from server.division_lookup import get_division
 from server.species_lookup import get_common_name
 from opentelemetry import trace
-from common_functions import log_and_abort
-from r_scriptrunner import R_ScriptRunner
 
+from server.common_functions import log_and_abort
+from server.r_scriptrunner import R_ScriptRunner
 
 class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
     def __init__(self, tracer, simulation_dictionary: dict[str, Simulation], version: str):
@@ -57,6 +57,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
         src_dir = Path(__file__).parent.parent.resolve() / Path("R_files")
         print(f"Copying files from {src_dir} to {output_directory}")
         shutil.copy(src_dir / "catch_file.csv", output_directory / "catch_file.csv")
+        shutil.copy(src_dir / "catch_file_original.csv", output_directory / "catch_file_original.csv")
         shutil.copy(src_dir / "id_file.csv", output_directory / "id_file.csv")
         shutil.copy(src_dir / "AA_CMSY++.R", output_directory / "AA_CMSY++.R")
         shutil.copy(src_dir / "ffnn.bin", output_directory / "ffnn.bin")
@@ -64,7 +65,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
         # =============================
         # CONTRACT SPECIES FILTERING (RUN ONLY CONTRACT SPECIES; THROW EVERYTHING ELSE)
         # - CONTRACT SPECIES COME FROM INIT MESSAGE: request.simulation.items.species[*].species_code
-        # - KEEP ONLY CONTRACT SPECIES IN catch_file.csv AND id_file.csv
+        # - KEEP ONLY CONTRACT SPECIES IN catch_file.csv, catch_file_original.csv AND id_file.csv
         # - IF CONTRACT SPECIES ARE MISSING FROM FILES: CONTINUE (PRINT WARNING)
         # =============================
         import csv
@@ -83,12 +84,13 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             )
 
         catch_file_path = output_directory / "catch_file.csv"
+        catch_file_original_path = output_directory / "catch_file_original.csv"
         id_file_path = output_directory / "id_file.csv"
 
         print(f"✅ Contract species ({len(contract_codes)}): {', '.join(sorted(contract_codes))}")
 
         # ---- FILTER id_file.csv (Stock column is FAO 3-alpha)
-        with open(id_file_path, newline="") as f:
+        with open(id_file_path, newline="", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             if not reader.fieldnames or "Stock" not in reader.fieldnames:
                 log_and_abort(
@@ -109,16 +111,19 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
 
         removed_id = len(id_rows) - len(id_filtered_rows)
 
-        with open(id_file_path, "w", newline="") as f:
+        with open(id_file_path, "w", newline="", encoding="utf-8-sig") as f:
             writer = csv.DictWriter(f, fieldnames=id_fieldnames)
             writer.writeheader()
             writer.writerows(id_filtered_rows)
 
         print(f"🧹 id_file.csv filtered to contract species (removed {removed_id} non-contract stocks).")
 
-        # ---- FILTER catch_file.csv (first column is Stock)
-        # NOTE: we KEEP HEADER if present; we FILTER DATA ROWS by contract_codes
-        with open(catch_file_path, newline="") as f:
+        # IMPORTANT:
+        # DO NOT FORCE btype TO CPUE HERE.
+        # THE FIRST HISTORICAL ASSESSMENT MUST RUN WITH THE ORIGINAL FILTERED btype VALUES.
+
+        # ---- FILTER catch_file.csv (working file for assessment)
+        with open(catch_file_path, newline="", encoding="utf-8-sig") as f:
             all_catch_rows = [row for row in csv.reader(f) if row]
 
         filtered_catch_rows = []
@@ -143,28 +148,63 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
 
         removed_catch = original_data_rows - kept_data_rows
 
-        with open(catch_file_path, "w", newline="") as f:
+        with open(catch_file_path, "w", newline="", encoding="utf-8-sig") as f:
             writer = csv.writer(f)
             writer.writerows(filtered_catch_rows)
 
         print(f"🧹 catch_file.csv filtered to contract species (removed {removed_catch} non-contract rows).")
 
+        # ---- FILTER catch_file_original.csv (full real time series kept for comparison)
+        with open(catch_file_original_path, newline="", encoding="utf-8-sig") as f:
+            all_original_rows = [row for row in csv.reader(f) if row]
+
+        filtered_original_rows = []
+        present_original = set()
+
+        original_real_data_rows = 0
+        kept_real_data_rows = 0
+
+        for row in all_original_rows:
+            stock = (row[0] or "").strip()
+
+            if stock.lower() == "stock":  # header
+                filtered_original_rows.append(row)
+                continue
+
+            original_real_data_rows += 1
+
+            if stock in contract_codes:
+                filtered_original_rows.append(row)
+                present_original.add(stock)
+                kept_real_data_rows += 1
+
+        removed_original = original_real_data_rows - kept_real_data_rows
+
+        with open(catch_file_original_path, "w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f)
+            writer.writerows(filtered_original_rows)
+
+        print(f"🧹 catch_file_original.csv filtered to contract species (removed {removed_original} non-contract rows).")
+
         # ---- WARN ABOUT MISSING CONTRACT SPECIES (DO NOT ABORT)
         missing_in_id = sorted(contract_codes - present_id)
         missing_in_catch = sorted(contract_codes - present_catch)
+        missing_in_original = sorted(contract_codes - present_original)
 
         if missing_in_id:
             print(f"⚠️ Contract species missing from id_file.csv (continuing): {', '.join(missing_in_id)}")
         if missing_in_catch:
             print(f"⚠️ Contract species missing from catch_file.csv (continuing): {', '.join(missing_in_catch)}")
+        if missing_in_original:
+            print(f"⚠️ Contract species missing from catch_file_original.csv (continuing): {', '.join(missing_in_original)}")
 
-        # NOTE: The effective species that will run (present in BOTH filtered files)
+        # NOTE: The effective species that will run (present in BOTH working files)
         effective_species = sorted((present_id & present_catch) & contract_codes)
         print(f"✅ Effective species to run (present in both files): {len(effective_species)}")
 
         # OPTIONAL: quick sanity peek (first few stocks)
         try:
-            with open(id_file_path, newline="") as f:
+            with open(id_file_path, newline="", encoding="utf-8-sig") as f:
                 rdr = csv.DictReader(f)
                 preview = [row["Stock"] for _, row in zip(range(10), rdr)]
             print(f"DEBUG: First id_file stocks: {preview}")
@@ -175,9 +215,35 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
 
         print(f"Create Stock Assessment for simulation {request.simulation_id} ")
 
-        # Run the R script. This messagehandler should be called by a client asynchonously and not awaited.
-        # In that case the R script will run in the background and the client will not wait for the result.
+        # === FIRST CMSY RUN (HISTORICAL) ===
         R_ScriptRunner.run_r_script_s3_upload("AA_CMSY++.R", request.simulation_id)
+
+        # === RENAME FIRST-RUN OUTPUTS LOCALLY TO _historical ===
+        # NOTE: THIS DOES NOT YET CHANGE S3 FILENAMES
+        self._rename_outputs_historical(request.simulation_id)
+
+        # === NEW CHANGE ===
+        # RENAME THE ORIGINAL HISTORICAL catch_file.csv
+        self._rename_first_catch_file_historical(request.simulation_id)
+
+        # === NEW CHANGE ===
+        # KEEP A HISTORICAL COPY OF id_file.csv FOR PHASE 1 TRACEABILITY
+        # NOTE: WE COPY INSTEAD OF RENAMING, BECAUSE PHASE 2 STILL NEEDS id_file.csv
+        self._create_historical_id_file_copy(request.simulation_id)
+
+        # === NEW CHANGE ===
+        # UPDATE THE WORKING id_file.csv FOR PHASE 2 USING THE HISTORICAL OUTPUT
+        # lcl.last.B_Bmsy / 2 -> stb.low
+        # ucl.last.B_Bmsy / 2 -> stb.hi
+        self._update_id_file_stb_from_historical_output(request.simulation_id)
+
+        # === IMPORTANT FIX ===
+        # FORCE btype TO CPUE ONLY AFTER THE HISTORICAL RUN
+        self._force_btype_cpue(request.simulation_id)
+
+        # === NEW CHANGE ===
+        # CREATE A FRESH catch_file.csv FOR SIMULATED DATA ONLY
+        self._create_empty_catch_file_for_simulation(request.simulation_id)
 
         return workflow_service_pb2.InitialiseResponse(
             simulation_id=request.simulation_id
@@ -217,6 +283,12 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
                                 clean = stock.strip()
                                 print(f"📋 Adding stock row: '{clean}'")
                                 stock_names.append(clean)
+
+                    # === NEW CHANGE ===
+                    # STORE METADATA EVEN IN THE NA BRANCH SO FINALISE CAN UPDATE id_file.csv
+                    sim.last_written_year = current_year
+                    sim.last_written_stock_names = stock_names.copy()
+
                     with open(catch_file_path, mode='a', newline='') as csvfile:
                         import os
                         writer = csv.writer(csvfile)
@@ -298,9 +370,6 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
 
         print(f"Finalise for simulation {request.simulation_id}")
 
-        print(f"Create Stock Assessment for simulation {request.simulation_id} ")
-        R_ScriptRunner.run_r_script_s3_upload("AA_CMSY++.R", request.simulation_id)
-
         sim = self.simulation_dictionary[request.simulation_id]
 
         if sim.last_written_year is not None and sim.last_written_stock_names is not None:
@@ -312,6 +381,14 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             print(f"✅ Finalise: id_file.csv updated for simulation {request.simulation_id}")
         else:
             print(f"⚠️ Finalise: No stock data found to update id_file.csv for {request.simulation_id}")
+
+        # === NEW CHANGE ===
+        # CREATE DETAILED YEAR-BY-YEAR CATCH COMPARISON
+        # USING FULL OVERLAPPING PERIOD PER STOCK
+        self._create_catch_comparison_detailed(request.simulation_id)
+
+        print(f"Create Stock Assessment for simulation {request.simulation_id} ")
+        R_ScriptRunner.run_r_script_s3_upload("AA_CMSY++.R", request.simulation_id)
 
         return workflow_service_pb2.FinaliseResponse(
             simulation_id=request.simulation_id
@@ -337,6 +414,29 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             print(f"id_file.csv not found for simulation {simulation_id}")
             return
 
+        # === NEW CHANGE ===
+        # DETERMINE THE FIRST SIMULATED YEAR FROM catch_file.csv
+        catch_file_path = Path(__file__).parent.parent / "simulations" / simulation_id / "catch_file.csv"
+        sim_start_year = None
+
+        try:
+            with open(catch_file_path, newline='') as csvfile:
+                reader = csv.DictReader(csvfile)
+                years = []
+                for row in reader:
+                    year_value = row.get("yr")
+                    if year_value and str(year_value).isdigit():
+                        years.append(int(year_value))
+
+                if years:
+                    sim_start_year = min(years)
+        except Exception as e:
+            print(f"⚠️ Could not determine simulation start year from catch_file.csv: {e}")
+
+        if sim_start_year is None:
+            print(f"⚠️ Could not determine simulation start year. Falling back to final year {year}")
+            sim_start_year = year
+
         with open(id_file_path, newline='') as csvfile:
             reader = list(csv.DictReader(csvfile))
             fieldnames = reader[0].keys() if reader else []
@@ -344,6 +444,10 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
         updated_rows = []
         for row in reader:
             if row.get("Stock") in stocks:
+                # === NEW CHANGE ===
+                # SET THE FULL SIMULATION YEAR WINDOW
+                row["MinOfYear"] = str(sim_start_year)
+                row["StartYear"] = str(sim_start_year)
                 row["MaxOfYear"] = str(year)
                 row["EndYear"] = str(year)
             updated_rows.append(row)
@@ -353,9 +457,469 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             writer.writeheader()
             writer.writerows(updated_rows)
 
-        print(f"✅ id_file.csv updated for year {year} and stocks: {stocks}")
+        print(f"✅ id_file.csv updated with simulation years {sim_start_year}-{year} for stocks: {stocks}")
+
+    # === NEW HELPER METHOD ===
+    # THIS FORCES btype TO CPUE FOR ALL ROWS IN THE WORKING id_file.csv
+    def _force_btype_cpue(self, simulation_id: str):
+        import csv
+
+        id_file_path = Path(__file__).parent.parent / "simulations" / simulation_id / "id_file.csv"
+
+        if not id_file_path.exists():
+            print(f"⚠️ id_file.csv not found for simulation {simulation_id}")
+            return
+
+        with open(id_file_path, newline='', encoding='utf-8-sig') as csvfile:
+            rows = list(csv.DictReader(csvfile))
+            fieldnames = rows[0].keys() if rows else []
+
+        if not fieldnames:
+            print(f"⚠️ id_file.csv is empty for simulation {simulation_id}")
+            return
+
+        if "btype" not in fieldnames:
+            print(f"⚠️ id_file.csv has no 'btype' column for simulation {simulation_id}")
+            return
+
+        updated_count = 0
+        for row in rows:
+            row["btype"] = "CPUE"
+            updated_count += 1
+
+        with open(id_file_path, mode='w', newline='', encoding='utf-8-sig') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+
+        print(f"✅ Forced btype='CPUE' for {updated_count} rows in id_file.csv")
+
+    # === NEW HELPER METHOD ===
+    # THIS UPDATES THE WORKING id_file.csv FOR PHASE 2
+    # USING THE HISTORICAL ASSESSMENT OUTPUT:
+    # lcl.last.B_Bmsy / 2 -> stb.low
+    # ucl.last.B_Bmsy / 2 -> stb.hi
+    def _update_id_file_stb_from_historical_output(self, simulation_id: str):
+        import csv
+
+        simulation_dir = Path(__file__).parent.parent / "simulations" / simulation_id
+        id_file_path = simulation_dir / "id_file.csv"
+
+        if not id_file_path.exists():
+            print(f"⚠️ id_file.csv not found for simulation {simulation_id}")
+            return
+
+        # === FIND THE HISTORICAL OUTPUT CSV PRODUCED BY THE FIRST ASSESSMENT ===
+        candidate_files = sorted(simulation_dir.glob("*id_file_output_historical.csv"))
+
+        if not candidate_files:
+            print(f"⚠️ No historical id_file output found in {simulation_dir}")
+            return
+
+        historical_output_path = candidate_files[0]
+        print(f"✅ Using historical assessment output: {historical_output_path.name}")
+
+        # === READ THE HISTORICAL OUTPUT ===
+        with open(historical_output_path, newline='', encoding='utf-8-sig') as csvfile:
+            hist_reader = csv.DictReader(csvfile)
+
+            if not hist_reader.fieldnames:
+                print(f"⚠️ Historical output file has no header: {historical_output_path}")
+                return
+
+            required_hist_columns = {"Stock", "lcl.last.B_Bmsy", "ucl.last.B_Bmsy"}
+            missing_hist_columns = required_hist_columns - set(hist_reader.fieldnames)
+
+            if missing_hist_columns:
+                print(
+                    f"⚠️ Historical output missing required columns: {', '.join(sorted(missing_hist_columns))}. "
+                    f"Found columns: {hist_reader.fieldnames}"
+                )
+                return
+
+            historical_map = {}
+            for row in hist_reader:
+                stock = (row.get("Stock") or "").strip()
+                if not stock:
+                    continue
+
+                lcl_val = row.get("lcl.last.B_Bmsy", "")
+                ucl_val = row.get("ucl.last.B_Bmsy", "")
+
+                try:
+                    lcl_float = float(lcl_val)
+                    ucl_float = float(ucl_val)
+
+                    # === NEW CHANGE ===
+                    # CONVERT B/Bmsy TO B/k USING SCHAEFER: B/Bmsy = 2 * (B/k)
+                    stb_low = lcl_float * 0.5
+                    stb_hi = ucl_float * 0.5
+
+                    # KEEP VALUES IN VALID B/k RANGE
+                    if stb_low <= 0 or stb_hi <= 0:
+                        print(f"⚠️ Invalid converted stb values for {stock}: {stb_low}, {stb_hi}. Skipping.")
+                        continue
+
+                    if stb_low >= stb_hi:
+                        print(f"⚠️ Converted stb.low >= stb.hi for {stock}: {stb_low}, {stb_hi}. Skipping.")
+                        continue
+
+                    if stb_hi > 1:
+                        print(f"⚠️ Converted stb.hi > 1 for {stock}: {stb_hi}. Clamping to 1.0")
+                        stb_hi = 1.0
+
+                    if stb_low >= stb_hi:
+                        print(f"⚠️ Converted and clamped stb.low >= stb.hi for {stock}: {stb_low}, {stb_hi}. Skipping.")
+                        continue
+
+                    historical_map[stock] = {
+                        "stb.low": str(stb_low),
+                        "stb.hi": str(stb_hi),
+                    }
+
+                except (TypeError, ValueError):
+                    print(f"⚠️ Could not convert historical B/Bmsy values for {stock}: {lcl_val}, {ucl_val}")
+
+        if not historical_map:
+            print(f"⚠️ No valid stock values found in historical output: {historical_output_path.name}")
+            return
+
+        # === READ THE WORKING id_file.csv ===
+        with open(id_file_path, newline='', encoding='utf-8-sig') as csvfile:
+            id_rows = list(csv.DictReader(csvfile))
+            fieldnames = id_rows[0].keys() if id_rows else []
+
+        if not fieldnames:
+            print(f"⚠️ id_file.csv is empty for simulation {simulation_id}")
+            return
+
+        required_id_columns = {"Stock", "stb.low", "stb.hi"}
+        missing_id_columns = required_id_columns - set(fieldnames)
+
+        if missing_id_columns:
+            print(
+                f"⚠️ id_file.csv missing required columns: {', '.join(sorted(missing_id_columns))}. "
+                f"Found columns: {list(fieldnames)}"
+            )
+            return
+
+        updated_count = 0
+        missing_stock_count = 0
+
+        for row in id_rows:
+            stock = (row.get("Stock") or "").strip()
+
+            if stock in historical_map:
+                row["stb.low"] = historical_map[stock]["stb.low"]
+                row["stb.hi"] = historical_map[stock]["stb.hi"]
+                updated_count += 1
+            else:
+                missing_stock_count += 1
+                print(f"⚠️ Stock not found in historical output, stb.low/stb.hi unchanged: {stock}")
+
+        # === WRITE BACK THE UPDATED WORKING id_file.csv ===
+        with open(id_file_path, mode='w', newline='', encoding='utf-8-sig') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(id_rows)
+
+        print(
+            f"✅ Updated stb.low/stb.hi in id_file.csv from historical output for {updated_count} stocks. "
+            f"Unmatched stocks: {missing_stock_count}"
+        )
+
+    # === NEW HELPER METHOD ===
+    # THIS CREATES A DETAILED YEAR-BY-YEAR COMPARISON FILE
+    # BETWEEN SIMULATED AND REAL CATCH (ct) AND BIOMASS (bt)
+    # USING THE FULL OVERLAPPING PERIOD PER STOCK
+    def _create_catch_comparison_detailed(self, simulation_id: str):
+        import csv
+
+        simulation_dir = Path(__file__).parent.parent / "simulations" / simulation_id
+        simulated_path = simulation_dir / "catch_file.csv"
+        original_path = simulation_dir / "catch_file_original.csv"
+        comparison_path = simulation_dir / "catch_comparison_detailed.csv"
+
+        if not simulated_path.exists():
+            print(f"⚠️ Simulated catch file not found: {simulated_path}")
+            return
+
+        if not original_path.exists():
+            print(f"⚠️ Original catch file not found: {original_path}")
+            return
+
+        try:
+            with open(simulated_path, newline='', encoding='utf-8-sig') as csvfile:
+                simulated_rows = list(csv.DictReader(csvfile))
+
+            with open(original_path, newline='', encoding='utf-8-sig') as csvfile:
+                original_rows = list(csv.DictReader(csvfile))
+        except Exception as e:
+            print(f"❌ Failed to read catch files for comparison: {e}")
+            return
+
+        if not simulated_rows:
+            print(f"⚠️ Simulated catch file is empty: {simulated_path}")
+            return
+
+        if not original_rows:
+            print(f"⚠️ Original catch file is empty: {original_path}")
+            return
+
+        def parse_float_or_none(value):
+            if value is None:
+                return None
+            value_str = str(value).strip()
+            if value_str == "" or value_str.upper() == "NA":
+                return None
+            try:
+                return float(value_str)
+            except (TypeError, ValueError):
+                return None
+
+        sim_by_stock = {}
+        real_by_stock = {}
+
+        for row in simulated_rows:
+            stock = (row.get("Stock") or "").strip()
+            year_value = row.get("yr")
+
+            if not stock or year_value is None:
+                continue
+
+            try:
+                year_int = int(year_value)
+            except (TypeError, ValueError):
+                continue
+
+            ct = parse_float_or_none(row.get("ct"))
+            bt = parse_float_or_none(row.get("bt"))
+
+            if stock not in sim_by_stock:
+                sim_by_stock[stock] = {}
+
+            sim_by_stock[stock][year_int] = {
+                "ct": ct,
+                "bt": bt,
+            }
+
+        for row in original_rows:
+            stock = (row.get("Stock") or "").strip()
+            year_value = row.get("yr")
+
+            if not stock or year_value is None:
+                continue
+
+            try:
+                year_int = int(year_value)
+            except (TypeError, ValueError):
+                continue
+
+            ct = parse_float_or_none(row.get("ct"))
+            bt = parse_float_or_none(row.get("bt"))
+
+            if stock not in real_by_stock:
+                real_by_stock[stock] = {}
+
+            real_by_stock[stock][year_int] = {
+                "ct": ct,
+                "bt": bt,
+            }
+
+        all_stocks = sorted(set(sim_by_stock.keys()) & set(real_by_stock.keys()))
+
+        if not all_stocks:
+            print(f"⚠️ No overlapping stocks found between simulated and original catch files for {simulation_id}")
+            return
+
+        comparison_rows = []
+
+        for stock in all_stocks:
+            sim_years = sorted(sim_by_stock[stock].keys())
+            real_years = sorted(real_by_stock[stock].keys())
+
+            if not sim_years or not real_years:
+                continue
+
+            overlap_start = max(min(sim_years), min(real_years))
+            overlap_end = min(max(sim_years), max(real_years))
+
+            if overlap_start > overlap_end:
+                print(f"⚠️ No overlapping years for stock {stock}")
+                continue
+
+            matched_years = 0
+
+            for year in range(overlap_start, overlap_end + 1):
+                if year not in sim_by_stock[stock]:
+                    continue
+                if year not in real_by_stock[stock]:
+                    continue
+
+                sim_ct = sim_by_stock[stock][year]["ct"]
+                sim_bt = sim_by_stock[stock][year]["bt"]
+
+                real_ct = real_by_stock[stock][year]["ct"]
+                real_bt = real_by_stock[stock][year]["bt"]
+
+                if sim_ct is not None and real_ct is not None:
+                    diff_ct = sim_ct - real_ct
+                    abs_diff_ct = abs(diff_ct)
+                    pct_diff_ct = (diff_ct / real_ct * 100.0) if real_ct != 0 else ""
+                else:
+                    diff_ct = ""
+                    abs_diff_ct = ""
+                    pct_diff_ct = ""
+
+                if sim_bt is not None and real_bt is not None:
+                    diff_bt = sim_bt - real_bt
+                    abs_diff_bt = abs(diff_bt)
+                    pct_diff_bt = (diff_bt / real_bt * 100.0) if real_bt != 0 else ""
+                else:
+                    diff_bt = ""
+                    abs_diff_bt = ""
+                    pct_diff_bt = ""
+
+                comparison_rows.append({
+                    "Stock": stock,
+                    "yr": year,
+
+                    "ct_real": real_ct,
+                    "ct_sim": sim_ct,
+                    "diff_ct": diff_ct,
+                    "abs_diff_ct": abs_diff_ct,
+                    "pct_diff_ct": pct_diff_ct,
+
+                    "bt_real": real_bt,
+                    "bt_sim": sim_bt,
+                    "diff_bt": diff_bt,
+                    "abs_diff_bt": abs_diff_bt,
+                    "pct_diff_bt": pct_diff_bt,
+                })
+
+                matched_years += 1
+
+            print(f"✅ Comparison rows created for stock {stock}: {matched_years} matched years ({overlap_start}-{overlap_end})")
+
+        if not comparison_rows:
+            print(f"⚠️ No comparison rows created for simulation {simulation_id}")
+            return
+
+        comparison_rows.sort(key=lambda x: (x["Stock"], x["yr"]))
+
+        with open(comparison_path, mode='w', newline='', encoding='utf-8-sig') as csvfile:
+            fieldnames = [
+                "Stock", "yr",
+                "ct_real", "ct_sim", "diff_ct", "abs_diff_ct", "pct_diff_ct",
+                "bt_real", "bt_sim", "diff_bt", "abs_diff_bt", "pct_diff_bt",
+            ]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(comparison_rows)
+
+        print(f"✅ Detailed catch & biomass comparison written to {comparison_path}")
+
+    # === HELPER METHOD ===
+    # THIS RENAMES ONLY OUTPUT FILES, NOT CORE INPUT / CONFIG FILES
+    def _rename_outputs_historical(self, simulation_id: str):
+        simulation_dir = Path(__file__).parent.parent / "simulations" / simulation_id
+
+        protected_files = {
+            "catch_file.csv",
+            "catch_file_original.csv",
+            "id_file.csv",
+            "AA_CMSY++.R",
+            "ffnn.bin",
+            "r2jags.bug",
+        }
+
+        if not simulation_dir.exists():
+            print(f"⚠️ Simulation directory not found: {simulation_dir}")
+            return
+
+        renamed_count = 0
+
+        for file_path in simulation_dir.iterdir():
+            if not file_path.is_file():
+                continue
+
+            if file_path.name in protected_files:
+                continue
+
+            if file_path.stem.endswith("_historical"):
+                continue
+
+            new_path = file_path.with_name(f"{file_path.stem}_historical{file_path.suffix}")
+
+            try:
+                file_path.rename(new_path)
+                renamed_count += 1
+                print(f"✅ Renamed: {file_path.name} -> {new_path.name}")
+            except Exception as e:
+                print(f"❌ Failed to rename {file_path.name}: {e}")
+
+        print(f"✅ Historical renaming complete. Renamed {renamed_count} files.")
+
+    # === NEW HELPER METHOD ===
+    # THIS RENAMES THE ORIGINAL HISTORICAL catch_file.csv
+    def _rename_first_catch_file_historical(self, simulation_id: str):
+        simulation_dir = Path(__file__).parent.parent / "simulations" / simulation_id
+        catch_file_path = simulation_dir / "catch_file.csv"
+        historical_catch_file_path = simulation_dir / "catch_file_historical.csv"
+
+        if not catch_file_path.exists():
+            print(f"⚠️ catch_file.csv not found for simulation {simulation_id}")
+            return
+
+        if historical_catch_file_path.exists():
+            print(f"⚠️ catch_file_historical.csv already exists for simulation {simulation_id}. Skipping rename.")
+            return
+
+        try:
+            catch_file_path.rename(historical_catch_file_path)
+            print(f"✅ Renamed catch_file.csv -> catch_file_historical.csv for simulation {simulation_id}")
+        except Exception as e:
+            print(f"❌ Failed to rename catch_file.csv to catch_file_historical.csv: {e}")
+
+    # === NEW HELPER METHOD ===
+    # THIS KEEPS A HISTORICAL COPY OF THE FILTERED id_file.csv
+    # NOTE: WE DO NOT RENAME THE WORKING id_file.csv, BECAUSE PHASE 2 STILL NEEDS IT
+    def _create_historical_id_file_copy(self, simulation_id: str):
+        simulation_dir = Path(__file__).parent.parent / "simulations" / simulation_id
+        id_file_path = simulation_dir / "id_file.csv"
+        historical_id_file_path = simulation_dir / "id_file_historical.csv"
+
+        if not id_file_path.exists():
+            print(f"⚠️ id_file.csv not found for simulation {simulation_id}")
+            return
+
+        if historical_id_file_path.exists():
+            print(f"⚠️ id_file_historical.csv already exists for simulation {simulation_id}. Skipping copy.")
+            return
+
+        try:
+            shutil.copy(id_file_path, historical_id_file_path)
+            print(f"✅ Created historical copy: id_file.csv -> id_file_historical.csv for simulation {simulation_id}")
+        except Exception as e:
+            print(f"❌ Failed to create id_file_historical.csv: {e}")
+
+    # === NEW HELPER METHOD ===
+    # THIS CREATES A NEW EMPTY catch_file.csv FOR SIMULATED DATA ONLY
+    def _create_empty_catch_file_for_simulation(self, simulation_id: str):
+        import csv
+
+        simulation_dir = Path(__file__).parent.parent / "simulations" / simulation_id
+        catch_file_path = simulation_dir / "catch_file.csv"
+
+        try:
+            with open(catch_file_path, mode='w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(["Stock", "yr", "ct", "bt"])
+            print(f"✅ Created new empty catch_file.csv for simulated data: {catch_file_path}")
+        except Exception as e:
+            print(f"❌ Failed to create new empty catch_file.csv for simulated data: {e}")
 
     def GetProtocolVersion(self, request: workflow_service_pb2.GetProtocolVersionRequest, context: grpc.ServicerContext):
         return workflow_service_pb2.GetProtocolVersionResponse(
-            protocol_version = self.version 
+            protocol_version=self.version
         )

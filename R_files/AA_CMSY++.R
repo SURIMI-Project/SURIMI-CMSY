@@ -62,7 +62,7 @@ n.chains     <- 2 # number of chains to be used in JAGS, default = 2
 catch_file  <- "catch_file.csv" #"Stocks_Catch_2020CMSYrun2_v5_RS - Copy.csv"  #"CombStocks_Catch_2020CMSYrun3_v4.csv"  # "SAUP_Catch_1.csv"  #"SimCatchCPUE_4.csv"  # "Stocks_Catch_Aust_2.csv" #"STECF_Catch_2020_2.csv" #"tRFMO_Catch_2020.csv" #"ICES_Catch_2020.csv" #"Global_Stocks_Catch.csv" #"SimCatchCPUE_4.csv" #"Stocks_Catch_Test.csv"  #"Stock_Catch_forRainer.csv" # "SimCatchCPUE_3.csv" #  name of file containing "Stock", "yr", "ct", and optional "bt"
 id_file     <- "id_file.csv" #"Stocks_ID_forDeng_RSb - Copy.csv" # "CombStocks_ID_2020CMSYrun3_v3_RF3.csv"   #    "SAUP_ID_2.csv"    #"SimSpecCPUE_4_NA_int_end.csv"  #"Train_ID_7j.csv" # "Stocks_ID_Aust_4.csv"  #"STECF_ID_2020_2.csv" #tRFMO_ID_2020_2.csv" #"ICES_ID_2020_4.csv" #"Robust_Stocks_ID_10_allNA.csv" #"SimSpecCPUE_4.csv"#"Stocks_ID_R_7.csv"  #"Stock_ID_forRainer.csv"  #  "NCod_ID_4.csv" #"SimSpecCPUE_3.csv" #  name of file containing stock-specific info and settings for the analysis
 nn_file     <-  "ffnn.bin" # file containing neural networks trained to estimate B/k priors
-outfile     <- paste("West_Med_",format(Sys.Date(),format="%B%d%Y_"),id_file,sep="") # default name for output file
+outfile <- "West_Med_id_file_output.csv" # default name for output file
 
 
 #----------------------------------------
@@ -462,7 +462,7 @@ for(stock in stocks) {
       return (NA) }
 
     # code to change start year to avoid ambiguity in biomass prior -----------------------------------------
-    ct.raw       <- as.numeric(cdat$ct[cdat$Stock==stock & cdat$yr >= start.yr & cdat$yr <= end.yr])/1000  ## assumes that catch is given in tonnes, transforms to '000 tonnes
+    ct.raw       <- as.numeric(cdat$ct[cdat$Stock==stock & cdat$yr >= start.yr & cdat$yr <= end.yr])/1000  ## here  catch is given in kg, transforms to  tonnes
     ct           <- ksmooth(x=yr,y=ct.raw,kernel="normal",n.points=length(yr),bandwidth=bw)$y
     ct.3         <- mean(ct[1:3])
     max.ct       <- max(ct)
@@ -965,7 +965,7 @@ if(substr(id_file,1,3)=="Sim") lines(x=yr, y=rep(true.MSY, length(yr)), lty="das
   # (b): plot r-k graph
   plot(x=ri1, y=ki1, xlim = c(0.95*quantile(ri1,0.001),1.2*quantile(ri1,0.999)),
        ylim = c(0.95*quantile(ki1,0.001),1.2*quantile(ki1,0.999)),
-       log="xy", xlab="r", ylab="k (1000 tonnes)", main="B: Finding viable r-k", pch=".", cex=2, bty="l",
+       log="xy", xlab="r", ylab="k (tonnes)", main="B: Finding viable r-k", pch=".", cex=2, bty="l",
        col=grey(0.7,0.4), cex.main = 1.5, cex.lab = 1.55, cex.axis = 1.5)
   lines(x=c(prior.r[1],prior.r[2],prior.r[2],prior.r[1],prior.r[1]), # plot original prior range
         y=c(prior.k[1],prior.k[1],prior.k[2],prior.k[2],prior.k[1]),
@@ -1360,7 +1360,7 @@ if(substr(id_file,1,3)=="Sim") lines(x=yr, y=rep(true.MSY, length(yr)), lty="das
   plot(x=rs, y=ks, xlim=c(min.x,max.x),
        ylim=c(min.y,max.y),
        pch=16, col="gray",log="xy", bty="l",
-       xlab="", ylab="k (1000 tonnes)", main="C: Analysis of viable r-k",  cex.main = 1.5, cex.lab = 1.55, cex.axis = 1.5)
+       xlab="", ylab="k (tonnes)", main="C: Analysis of viable r-k",  cex.main = 1.5, cex.lab = 1.55, cex.axis = 1.5)
   title(xlab = "r", line = 2.25, cex.lab = 1.55)
 
   # plot r-k pairs from MCMC
@@ -1512,7 +1512,7 @@ jpeg(filename = filename_silent2,
     #---------------------
     max.y <- max(c(1.1*max(ct.jags),ucl.MSY),na.rm=T)
     plot(x=yr,rep(0,nyr),type="n",ylim=c(0,max.y), bty="l", main=paste("Catch",gsub(":","",gsub("/","-",stock))),
-         xlab="",ylab="Catch (1000 tonnes/year)",  cex.main = 1.6, cex.lab = 1.35, cex.axis = 1.35)
+         xlab="",ylab="Catch (tonnes/year)",  cex.main = 1.6, cex.lab = 1.35, cex.axis = 1.35)
     rect(yr[1],lcl.MSY,yr[nyr],ucl.MSY,col="lightgray", border=NA)
     lines(x=c(yr[1],yr[nyr]),y=c(MSY,MSY),lty="dashed", col="black", lwd=2)
     lines(x=yr, y=ct.jags, lwd=2) #
@@ -1632,7 +1632,7 @@ if (retrosp.step>0) jpgfile<-gsub(".jpg", paste0("_retrostep_",retrosp.step,".jp
     par(mfrow=c(1,1),mar=c(4.5,4.5,2,0.5))
     plot(x=ri1, y=ki1, xlim = c(0.95*quantile(ri1,0.001),1.2*quantile(ri1,0.999)),
          ylim = c(0.95*quantile(ki1,0.001),1.2*quantile(ki1,0.999)),
-         log="xy", xlab="r", ylab="k (1000 tonnes)", main="r-k diagnostic", pch=".", cex=3, bty="l",
+         log="xy", xlab="r", ylab="k (tonnes)", main="r-k diagnostic", pch=".", cex=3, bty="l",
          col=rgb(0,0,1,0.5), cex.main = 1.5, cex.lab = 1.55, cex.axis = 1.5)
     points(ppd.r,ppd.k,pch=16,col=rgb(1,0,0,0.5),cex=0.5)
     points(ri.emp,ki1.emp,pch=16,col=rgb(1,0,1,0.5),cex=0.5)
@@ -1691,7 +1691,7 @@ if (retrosp.step>0) jpgfile<-gsub(".jpg", paste0("_retrostep_",retrosp.step,".jp
     legend("topright",pp,cex=1.4,bty="n")
 
     # k
-    pp.lab = "k (1000 tonnes)"
+    pp.lab = "k (tonnes)"
     rpr = sort(rk[,2])
     post = ks
     prior <-dlnorm(sort(rpr),meanlog = mean.log.k, sdlog = sd.log.k) #><>HW now pdf
@@ -1712,7 +1712,7 @@ if (retrosp.step>0) jpgfile<-gsub(".jpg", paste0("_retrostep_",retrosp.step,".jp
     mtext(paste0("CMSY prior & posterior distributions for ",stock),  side=3,cex=1.5)
 
     # MSY
-    pp.lab = "MSY (1000 tonnes/year)"
+    pp.lab = "MSY (tonnes/year)"
     rpr = sort(rk[,1]*rk[,2]/4)
     post = rs*ks/4
     prior <-dlnorm(sort(rpr),meanlog = mean(log(rpr)), sdlog = sd(log(rpr))) #><>HW now pdf
@@ -1832,7 +1832,7 @@ if (retrosp.step>0) jpgfile<-gsub(".jpg", paste0("_retrostep_",retrosp.step,".jp
     legend("topright",pp,cex=1.4,bty="n")
 
     # k
-    pp.lab = "k (1000 tonnes)"
+    pp.lab = "k (tonnes)"
     rpr = sort(rk[,2])
     post = ks.bsm
     prior <-dlnorm(sort(rpr),meanlog = mean.log.k, sdlog = sd.log.k) #><>HW now pdf
@@ -1853,7 +1853,7 @@ if (retrosp.step>0) jpgfile<-gsub(".jpg", paste0("_retrostep_",retrosp.step,".jp
     mtext(paste0("BSM prior & posterior distributions for ",stock),  side=3,cex=1.5)
 
     # MSY
-    pp.lab = "MSY (1000 tonnes/year)"
+    pp.lab = "MSY (tonnes/year)"
     rpr = sort(rk[,1]*rk[,2]/4)
     post = rs.bsm*ks.bsm/4
     prior <-dlnorm(sort(rpr),meanlog = mean(log(rpr)), sdlog = sd(log(rpr))) #><>HW now pdf
@@ -1966,7 +1966,7 @@ if (retrosp.step>0) jpgfile<-gsub(".jpg", paste0("_retrostep_",retrosp.step,".jp
     # Observed vs Predicted Catch
     cord.y<-c(lcl.ct.jags,rev(ucl.ct.jags))
     plot(yr,ct,type="n",ylim=c(0,max(ct.jags,na.rm=T)),lty=1,lwd=1.3,xlab="Year",
-         ylab=paste0("Catch (1000 tonnes)"),main=paste("Catch fit",stock),bty="l")
+         ylab=paste0("Catch (tonnes)"),main=paste("Catch fit",stock),bty="l")
     polygon(cord.x,cord.y,col="gray",border=0,lty=1)
     lines(yr,ct.jags,lwd=2,col=1)
     points(yr,(ct),pch=21,bg="white",cex=1.)
@@ -2364,8 +2364,8 @@ if (kobe.plot == TRUE) {
     management_text<-paste("\\\\textbf{Results for management (based on",ifelse(FullSchaefer==F | force.cmsy==T,"CMSY","BSM"),"analysis)}\\\\\\\\")
     management_text<-(paste(management_text,"\n\n","Fmsy = ",format(Fmsy, digits =3),", 95% CL = ",format(lcl.Fmsy, digits =3)," - ",format(ucl.Fmsy, digits =3)," (if B $>$ 1/2 Bmsy then Fmsy = 0.5 r)", sep=""))
     management_text<-(paste(management_text,"\n\n","Fmsy = ",format(Fmsy.adj[nyr], digits =3),", 95% CL = ",format(lcl.Fmsy.adj[nyr], digits =3)," - ",format(ucl.Fmsy.adj[nyr], digits =3)," (r and Fmsy are linearly reduced if B $<$ 1/2 Bmsy)",sep=""))
-    management_text<-(paste(management_text,"\n\n","MSY = ",format(MSY, digits =3),",  95% CL = ",format(lcl.MSY, digits =3)," - ",format(ucl.MSY, digits =3),'; Bmsy = ',format(Bmsy, digits =3),",  95% CL = ",format(lcl.Bmsy, digits =3)," - ",format(ucl.Bmsy, digits =3)," (1000 tonnes)",sep=""))
-    management_text<-(paste(management_text,"\n\n","Biomass in last year = ",format(B[nyr], digits =3),", 95% CL = ", format(lcl.B[nyr], digits =3), " - ",format(ucl.B[nyr], digits =3)," (1000 tonnes)",sep=""))
+    management_text<-(paste(management_text,"\n\n","MSY = ",format(MSY, digits =3),",  95% CL = ",format(lcl.MSY, digits =3)," - ",format(ucl.MSY, digits =3),'; Bmsy = ',format(Bmsy, digits =3),",  95% CL = ",format(lcl.Bmsy, digits =3)," - ",format(ucl.Bmsy, digits =3)," (tonnes)",sep=""))
+    management_text<-(paste(management_text,"\n\n","Biomass in last year = ",format(B[nyr], digits =3),", 95% CL = ", format(lcl.B[nyr], digits =3), " - ",format(ucl.B[nyr], digits =3)," (tonnes)",sep=""))
     management_text<-(paste(management_text,"\n\n","B/Bmsy in last year = " ,format(B.Bmsy[nyr], digits =3),", 95% CL = ", format(lcl.B.Bmsy[nyr], digits =3), " - ",format(ucl.B.Bmsy[nyr], digits =3),sep=""))
     management_text<-(paste(management_text,"\n\n","Fishing mortality in last year = ",format(Ft[nyr], digits =3),", 95% CL =", format(lcl.Ft[nyr], digits =3), " - ",format(ucl.Ft[nyr], digits =3),sep=""))
     management_text<-(paste(management_text,"\n\n","F/Fmsy  = ",format(F.Fmsy[nyr], digits =3),", 95% CL = ", format(lcl.F.Fmsy[nyr], digits =3), " - ",format(ucl.F.Fmsy[nyr], digits =3),sep=""))
@@ -2373,8 +2373,8 @@ if (kobe.plot == TRUE) {
     docTemplate<-gsub("#MANAGEMENT#", management_text, docTemplate)
 
     analysis_text<-(paste("\\\\textbf{Results of CMSY analysis conducted in JAGS}\\\\\\\\",sep=""))
-    analysis_text<-(paste(analysis_text,"\n\n","r = ", format(r.cmsy, digits =3),", 95% CL = ", format(lcl.r.cmsy, digits =3), " - ", format(ucl.r.cmsy, digits =3),"; k = ", format(k.cmsy, digits =3),", 95% CL = ", format(lcl.k.cmsy, digits =3), " - ", format(ucl.k.cmsy, digits =3)," (1000 tonnes)",sep=""))
-    analysis_text<-(paste(analysis_text,"\n\n","MSY = ", format(MSY.cmsy, digits =3),", 95% CL = ", format(lcl.MSY.cmsy, digits =3), " - ", format(ucl.MSY.cmsy, digits =3)," (1000 tonnes/year)",sep=""))
+    analysis_text<-(paste(analysis_text,"\n\n","r = ", format(r.cmsy, digits =3),", 95% CL = ", format(lcl.r.cmsy, digits =3), " - ", format(ucl.r.cmsy, digits =3),"; k = ", format(k.cmsy, digits =3),", 95% CL = ", format(lcl.k.cmsy, digits =3), " - ", format(ucl.k.cmsy, digits =3)," (tonnes)",sep=""))
+    analysis_text<-(paste(analysis_text,"\n\n","MSY = ", format(MSY.cmsy, digits =3),", 95% CL = ", format(lcl.MSY.cmsy, digits =3), " - ", format(ucl.MSY.cmsy, digits =3)," (tonnes/year)",sep=""))
     analysis_text<-(paste(analysis_text,"\n\n","Relative biomass last year = ", format(bk.cmsy[nyr], digits =3), " k, 95% CL = ", format(lcl.bk.cmsy[nyr], digits =3), " - ", format(ucl.bk.cmsy[nyr], digits =3),sep=""))
     analysis_text<-(paste(analysis_text,"\n\n","Exploitation F/(r/2) in last year = ", format((FFmsy.cmsy)[length(bk.cmsy)-1], digits =3),sep=""))
 
@@ -2383,7 +2383,7 @@ if (kobe.plot == TRUE) {
       analysis_text<-(paste(analysis_text,"\n\n", "\\\\textbf{Results from Bayesian Schaefer model using catch and ",btype,"}\\\\\\\\",sep=""))
       analysis_text<-(paste(analysis_text,"\n\n","r = ", format(r.bsm, digits =3),", 95% CL = ", format(lcl.r.bsm, digits =3), " - ", format(ucl.r.bsm, digits =3),"; k = ", format(k.bsm, digits =3),", 95% CL = ", format(lcl.k.bsm, digits =3), " - ", format(ucl.k.bsm, digits =3),sep=""))
       analysis_text<-(paste(analysis_text,"\n\n","r-k log correlation = ", format(log.kr.cor, digits =3),sep=""))
-      analysis_text<-(paste(analysis_text,"\n\n","MSY = ", format(MSY.bsm, digits =3),", 95% CL = ", format(lcl.MSY.bsm, digits =3), " - ", format(ucl.MSY.bsm, digits =3)," (1000 tonnes/year)",sep=""))
+      analysis_text<-(paste(analysis_text,"\n\n","MSY = ", format(MSY.bsm, digits =3),", 95% CL = ", format(lcl.MSY.bsm, digits =3), " - ", format(ucl.MSY.bsm, digits =3)," (tonnes/year)",sep=""))
       analysis_text<-(paste(analysis_text,"\n\n","Relative biomass in last year = ", format(bk.cmsy[nyr], digits =3), " k, 95% CL = ",format(lcl.bk.cmsy[nyr], digits =3)," - ", format(ucl.bk.cmsy[nyr], digits =3),sep=""))
       analysis_text<-(paste(analysis_text,"\n\n","Exploitation F/(r/2) in last year = ", format((ct.raw[nyr]/(bk.cmsy[nyr]*k.bsm))/(r.bsm/2), digits =3),sep=""))
       analysis_text<-(paste(analysis_text,"\n\n","q = ", format(q.bsm, digits =3),", 95% CL = ", format(lcl.q.bsm, digits =3), " - ", format(ucl.q.bsm, digits =3),sep=""))
@@ -2403,7 +2403,7 @@ if (kobe.plot == TRUE) {
     analysis_text<-(paste(analysis_text,"\n\n","Prior initial relative biomass = ", format(startbio[1], digits =3) , " - ", format(startbio[2], digits =3),ifelse(is.na(stb.low)==T," default"," expert"),sep=""))
     analysis_text<-(paste(analysis_text,"\n\n","Prior intermediate relative biomass = ", format(intbio[1], digits =3), " - ", format(intbio[2], digits =3), " in year ", int.yr,ifelse(is.na(intb.low)==T," default"," expert"),sep=""))
     analysis_text<-(paste(analysis_text,"\n\n","Prior final relative biomass = ", format(endbio[1], digits =3), " - ", format(endbio[2], digits =3),ifelse(is.na(endb.low)==T,", default"," expert"),sep=""))
-    analysis_text<-(paste(analysis_text,"\n\n","Prior range for r = ", format(prior.r[1],digits=2), " - ", format(prior.r[2],digits=2),ifelse(is.na(r.low)==T," default"," expert"),", prior range for k = " , format(prior.k[1], digits =3), " - ", format(prior.k[2], digits =3)," (1000 tonnes) default",sep=""))
+    analysis_text<-(paste(analysis_text,"\n\n","Prior range for r = ", format(prior.r[1],digits=2), " - ", format(prior.r[2],digits=2),ifelse(is.na(r.low)==T," default"," expert"),", prior range for k = " , format(prior.k[1], digits =3), " - ", format(prior.k[2], digits =3)," (tonnes) default",sep=""))
     analysis_text<-(paste(analysis_text,"\n\n","Source for relative biomass: \n\n",source,"",sep=""))
 
     docTemplate<-gsub("#ANALYSIS#", analysis_text, docTemplate)
