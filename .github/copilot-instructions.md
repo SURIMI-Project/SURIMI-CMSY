@@ -11,9 +11,12 @@
   - `docker build -f Dockerfile . -t ghcr.io/official-ewe/surimicmsy:latest`
 - Run the container locally:
   - `docker run -p 5021:5021 ghcr.io/official-ewe/surimicmsy:latest`
-- There is no checked-in automated test suite or lint configuration. The only repo-defined targeted smoke checks are the helper modules with `__main__` blocks:
+- There is no checked-in unit test or lint configuration. The only repo-defined targeted smoke checks are the helper modules with `__main__` blocks:
   - `.\.venv\Scripts\python.exe server\species_lookup.py`
   - `.\.venv\Scripts\python.exe server\division_lookup.py`
+- Integration tests live in `integration_tests\`. They start the CMSY service as a subprocess and send real gRPC messages to it. Run them from the repo root with:
+  - `.\.venv\Scripts\python.exe -m pytest integration_tests\tests\ -v`
+  - The JSON request fixtures are in `integration_tests\GrpcMessages\<MessageName>\request.json`
 
 ## High-level architecture
 
@@ -43,3 +46,9 @@
   Do not collapse these formats unless the whole pipeline is updated together.
 - `server\species_lookup.py` and `server\division_lookup.py` load their lookup datasets once at module import from `R_files\`. Changes to those file locations or schemas ripple into runtime behavior immediately.
 - `server\app.py` currently mixes package imports (`from server...`) with sibling imports (`from otlp_tracing import ...`, `from vault_service import ...`). Follow the existing entrypoint pattern (`python server\app.py` and the Docker `CMD`) unless you are deliberately normalizing imports across the whole service.
+
+## Related repositories
+
+- The gRPC protocol definition (`.proto` files) lives in a sibling repository:
+  - `C:\Users\Rik\source\repos\SURIMI-protocol\`
+  - Consult the `.proto` files there for exact field names, message structures, enum values, and required vs optional fields when generating JSON test fixtures, assertions, or any protobuf-related code.
