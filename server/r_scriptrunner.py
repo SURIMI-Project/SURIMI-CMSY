@@ -6,8 +6,8 @@ from server.s3_storage import S3_Storage
 
 class R_ScriptRunner:
     @staticmethod
-    def run_r_script_s3_upload(script_name, simulation_id):
-        script = Path(__file__).parent.parent.resolve() / Path("simulations") / simulation_id / script_name
+    def run_r_script_s3_upload(script_name, experiment_id):
+        script = Path(__file__).parent.parent.resolve() / Path("experiments") / experiment_id / script_name
 
         print(f"Running R script: {script}")
 
@@ -33,6 +33,6 @@ class R_ScriptRunner:
 
         if result.returncode == 0:
             print("✅ CMSY++ completed.")
-            S3_Storage.UploadFilesToS3(os.path.dirname(script), f"surimi-cmsy/Simulations/{simulation_id}")
+            S3_Storage.UploadFilesToS3(os.path.dirname(script), f"surimi-cmsy/Experiments/{experiment_id}")
         else:
             print(f"❌ CMSY++ failed with exit code {result.returncode}.")

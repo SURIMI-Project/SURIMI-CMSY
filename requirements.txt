@@ -4,7 +4,7 @@ opentelemetry-api==1.39.1
 opentelemetry-sdk==1.39.1
 opentelemetry-instrumentation-grpc
 protobuf>=7.34.0
-surimi-surimi-protocol-grpc-python==1.70.1.1.20260324113513+a7c1d9807315 
+surimi-surimi-protocol-grpc-python==1.70.1.1.20260521091242+1e16c87aff1f 
 --extra-index-url https://buf.build/gen/python
 python-dateutil
 boto3
