@@ -1,9 +1,8 @@
-from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import grpc
 from server.s3_storage import S3_Storage
 from server.Simulation import Simulation
-from surimi.v1 import workflow_service_pb2, workflow_service_pb2_grpc
+from surimi.v1 import stock_assesment_service_pb2_grpc, initialise_experiment_pb2, finalise_experiment_pb2, experiment_step_pb2, finalise_experiment_pb2, cancel_experiment_pb2, update_biomass_statistics_pb2, update_catch_disposition_statistics_pb2, get_protocol_version_pb2
 from pathlib import Path
 import shutil
 from server.division_lookup import get_division
@@ -13,25 +12,25 @@ from opentelemetry import trace
 from server.common_functions import log_and_abort
 from server.r_scriptrunner import R_ScriptRunner
 
-class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
-    def __init__(self, tracer, simulation_dictionary: dict[str, Simulation], version: str):
-        self.simulation_dictionary = simulation_dictionary  # Will hold the current simulation instance
+class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServiceServicer):
+    def __init__(self, tracer, experiment_dictionary: dict[str, Simulation], version: str):
+        self.experiment_dictionary = experiment_dictionary  # Will hold the current simulation instance
         self.tracer = tracer  # Store the tracer instance
         self.version = version  # Store the version
 
-    def Initialise(self, request: workflow_service_pb2.InitialiseRequest, context):
-        trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
+    def InitialiseExperiment(self, request: initialise_experiment_pb2.InitialiseExperimentRequest, context):
+        trace.get_current_span().set_attribute("experiment_id", request.experiment_id)
         print("InitialiseRequest fields:", [f.name for f in request.DESCRIPTOR.fields])
         print("✅ CONTRACT FILTERING ENABLED (WORKFLOW_SERVICE.PY UPDATED)")
 
-        if request.simulation_id in self.simulation_dictionary.keys():
-            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} already exists.")
+        if request.experiment_id in self.experiment_dictionary.keys():
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} already exists.")
 
         if request.simulation.time_step != "P1M":
             log_and_abort(
                 context,
                 grpc.StatusCode.INVALID_ARGUMENT,
-                f"Error in simulation {request.simulation_id}: Only monthly steps are supported. Please set the step size to P1M."
+                f"Error in experiment {request.experiment_id}: Only monthly steps are supported. Please set the step size to P1M."
             )
 
         simulation = Simulation(
@@ -39,16 +38,16 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             step_size=request.simulation.time_step,
         )
         print(
-            f"Init simulation {request.simulation_id} for scenario {request.scenario_id} "
+            f"Init experiment {request.experiment_id} for scenario {request.scenario_name} "
             f"with start date {request.simulation.start_date_time} and step size {request.simulation.time_step}"
         )
 
         S3_Storage.DownloadFilesFromS3("surimi-cmsy/config", "R_files")
 
-        output_directory = Path(__file__).parent.parent.resolve() / Path("simulations") / request.simulation_id
+        output_directory = Path(__file__).parent.parent.resolve() / Path("experiments") / request.experiment_id
         try:
             output_directory.mkdir(parents=True, exist_ok=True)
-            print(f"Created simulation directory: {output_directory}")
+            print(f"Created experiment directory: {output_directory}")
         except FileExistsError:
             log_and_abort(context, grpc.StatusCode.ALREADY_EXISTS, f"Directory already exists: {output_directory}")
         except Exception as e:
@@ -211,55 +210,55 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
         except Exception as e:
             print(f"DEBUG: Could not preview id_file.csv: {e}")
 
-        self.simulation_dictionary[request.simulation_id] = simulation
+        self.experiment_dictionary[request.experiment_id] = simulation
 
-        print(f"Create Stock Assessment for simulation {request.simulation_id} ")
+        print(f"Create Stock Assessment for experiment {request.experiment_id} ")
 
         # === FIRST CMSY RUN (HISTORICAL) ===
-        R_ScriptRunner.run_r_script_s3_upload("AA_CMSY++.R", request.simulation_id)
+        R_ScriptRunner.run_r_script_s3_upload("AA_CMSY++.R", request.experiment_id)
 
         # === RENAME FIRST-RUN OUTPUTS LOCALLY TO _historical ===
         # NOTE: THIS DOES NOT YET CHANGE S3 FILENAMES
-        self._rename_outputs_historical(request.simulation_id)
+        self._rename_outputs_historical(request.experiment_id)
 
         # === NEW CHANGE ===
         # RENAME THE ORIGINAL HISTORICAL catch_file.csv
-        self._rename_first_catch_file_historical(request.simulation_id)
+        self._rename_first_catch_file_historical(request.experiment_id)
 
         # === NEW CHANGE ===
         # KEEP A HISTORICAL COPY OF id_file.csv FOR PHASE 1 TRACEABILITY
         # NOTE: WE COPY INSTEAD OF RENAMING, BECAUSE PHASE 2 STILL NEEDS id_file.csv
-        self._create_historical_id_file_copy(request.simulation_id)
+        self._create_historical_id_file_copy(request.experiment_id)
 
         # === NEW CHANGE ===
         # UPDATE THE WORKING id_file.csv FOR PHASE 2 USING THE HISTORICAL OUTPUT
         # lcl.last.B_Bmsy / 2 -> stb.low
         # ucl.last.B_Bmsy / 2 -> stb.hi
-        self._update_id_file_stb_from_historical_output(request.simulation_id)
+        self._update_id_file_stb_from_historical_output(request.experiment_id)
 
         # === IMPORTANT FIX ===
         # FORCE btype TO CPUE ONLY AFTER THE HISTORICAL RUN
-        self._force_btype_cpue(request.simulation_id)
+        self._force_btype_cpue(request.experiment_id)
 
         # === NEW CHANGE ===
         # CREATE A FRESH catch_file.csv FOR SIMULATED DATA ONLY
-        self._create_empty_catch_file_for_simulation(request.simulation_id)
+        self._create_empty_catch_file_for_experiment(request.experiment_id)
 
-        return workflow_service_pb2.InitialiseResponse(
-            simulation_id=request.simulation_id
+        return initialise_experiment_pb2.InitialiseExperimentResponse(
+            experiment_id=request.experiment_id
         )
 
-    def SimulateStep(self, request: workflow_service_pb2.SimulateStepRequest, context):
-        trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
-        if request.simulation_id not in self.simulation_dictionary:
-            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
+    def ExperimentStep(self, request: experiment_step_pb2.ExperimentStepRequest, context):
+        trace.get_current_span().set_attribute("experiment_id", request.experiment_id)
+        if request.experiment_id not in self.experiment_dictionary:
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} not known.")
 
-        sim = self.simulation_dictionary[request.simulation_id]
+        sim = self.experiment_dictionary[request.experiment_id]
 
         if sim.step_size != "P1M":
-            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Error in simulation {request.simulation_id}: Only monthly steps are supported. Please set the step size to P1M.")
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Error in experiment {request.experiment_id}: Only monthly steps are supported. Please set the step size to P1M.")
 
-        print(f"SimulateStep for simulation {request.simulation_id} and date {sim.current_date_time}")
+        print(f"SimulateStep for experiment {request.experiment_id} and date {sim.current_date_time}")
 
         current_year = sim.current_date_time.year
         sim.current_date_time += relativedelta(months=1)
@@ -267,11 +266,11 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
         if current_year != sim.current_date_time.year:
             print(f"Year {current_year} is complete. Processing catch data.")
 
-            catch_file_path = Path(__file__).parent.parent.resolve() / "simulations" / request.simulation_id / "catch_file.csv"
+            catch_file_path = Path(__file__).parent.parent.resolve() / "experiments" / request.experiment_id / "catch_file.csv"
 
             if not sim.aggregated_catch_dictionary:
                 print("⚠️ No aggregated catch data found. Writing NA entries to catch_file.csv")
-                id_file_path = Path(__file__).parent.parent / "simulations" / request.simulation_id / "id_file.csv"
+                id_file_path = Path(__file__).parent.parent / "experiments" / request.experiment_id / "id_file.csv"
                 try:
                     import csv
                     stock_names = []
@@ -302,8 +301,8 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
                         print(f"✅ Wrote {count} NA rows to {catch_file_path}")
                 except Exception as e:
                     print(f"❌ Failed to write NA entries to catch_file.csv: {e}")
-                return workflow_service_pb2.SimulateStepResponse(
-                    simulation_id=request.simulation_id
+                return experiment_step_pb2.ExperimentStepResponse(
+                    experiment_id=request.experiment_id
                 )
 
             catch_file = {}
@@ -339,7 +338,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             sim.aggregated_catch_dictionary.clear()
             sim.aggregated_biomass.clear()
 
-            id_file_path = Path(__file__).parent.parent / "simulations" / request.simulation_id / "id_file.csv"
+            id_file_path = Path(__file__).parent.parent / "experiments" / request.experiment_id / "id_file.csv"
             try:
                 with open(id_file_path, newline='') as idfile:
                     reader = csv.DictReader(idfile)
@@ -359,64 +358,131 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             except Exception as e:
                 print(f"❌ Failed to append missing NA rows: {e}")
 
-        return workflow_service_pb2.SimulateStepResponse(
-            simulation_id=request.simulation_id
+        return experiment_step_pb2.ExperimentStepResponse(
+            experiment_id=request.experiment_id
         )
 
-    def Finalise(self, request: workflow_service_pb2.FinaliseRequest, context):
-        trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
-        if request.simulation_id not in self.simulation_dictionary:
-            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
+    def FinaliseExperiment(self, request: finalise_experiment_pb2.FinaliseExperimentRequest, context):
+        trace.get_current_span().set_attribute("experiment_id", request.experiment_id)
+        if request.experiment_id not in self.experiment_dictionary:
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} not known.")
 
-        print(f"Finalise for simulation {request.simulation_id}")
+        print(f"Finalise for experiment {request.experiment_id}")
 
-        sim = self.simulation_dictionary[request.simulation_id]
+        sim = self.experiment_dictionary[request.experiment_id]
 
         if sim.last_written_year is not None and sim.last_written_stock_names is not None:
             self._update_id_file(
-                request.simulation_id,
+                request.experiment_id,
                 sim.last_written_stock_names,
                 sim.last_written_year
             )
-            print(f"✅ Finalise: id_file.csv updated for simulation {request.simulation_id}")
+            print(f"✅ Finalise: id_file.csv updated for experiment {request.experiment_id}")
         else:
-            print(f"⚠️ Finalise: No stock data found to update id_file.csv for {request.simulation_id}")
+            print(f"⚠️ Finalise: No stock data found to update id_file.csv for experiment {request.experiment_id}")
 
         # === NEW CHANGE ===
         # CREATE DETAILED YEAR-BY-YEAR CATCH COMPARISON
         # USING FULL OVERLAPPING PERIOD PER STOCK
-        self._create_catch_comparison_detailed(request.simulation_id)
+        self._create_catch_comparison_detailed(request.experiment_id)
 
-        print(f"Create Stock Assessment for simulation {request.simulation_id} ")
-        R_ScriptRunner.run_r_script_s3_upload("AA_CMSY++.R", request.simulation_id)
+        print(f"Create Stock Assessment for experiment {request.experiment_id} ")
+        R_ScriptRunner.run_r_script_s3_upload("AA_CMSY++.R", request.experiment_id)
 
-        return workflow_service_pb2.FinaliseResponse(
-            simulation_id=request.simulation_id
+        return finalise_experiment_pb2.FinaliseExperimentResponse(
+            experiment_id=request.experiment_id
         )
 
-    def Cancel(self, request: workflow_service_pb2.CancelRequest, context):
-        trace.get_current_span().set_attribute("simulation_id", request.simulation_id)
-        if request.simulation_id not in self.simulation_dictionary:
-            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Simulation Id {request.simulation_id} not known.")
+    def CancelExperiment(self, request: cancel_experiment_pb2.CancelExperimentRequest, context):
+        trace.get_current_span().set_attribute("experiment_id", request.experiment_id)
+        if request.experiment_id not in self.experiment_dictionary:
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} not known.")
 
-        print(f"Cancel for simulation {request.simulation_id}")
+        print(f"Cancel for experiment {request.experiment_id}")
 
-        return workflow_service_pb2.CancelResponse(
-            simulation_id=request.simulation_id
+        return cancel_experiment_pb2.CancelExperimentResponse(
+            experiment_id=request.experiment_id
         )
 
-    def _update_id_file(self, simulation_id: str, stocks: list[str], year: int):
+    def UpdateBiomassStatistics(self, request : update_biomass_statistics_pb2.UpdateBiomassStatisticsRequest, context):
+        trace.get_current_span().set_attribute("experiment_id", request.experiment_id)
+        if request.experiment_id not in self.experiment_dictionary:
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} not known.")
+
+        print(f"Update biomass for experiment {request.experiment_id}")
+        # print(request)  # for debugging purposes
+
+        sim = self.experiment_dictionary[request.experiment_id]
+
+        # Loop over every grid in biomass_grids
+        for grid in request.biomass_statistics_summary.biomass_grids_statistics:
+            # Check if the species is already in the aggregated_biomass
+            if grid.species.species_code not in sim.aggregated_biomass:
+                sim.aggregated_biomass[grid.species.species_code] = {}
+
+            # Loop over every cell in the grid
+            for cell in grid.biomass_cells_statistics:
+                cell_key = (cell.latitude, cell.longitude)
+                # Check if the cell is already in the aggregated_biomass for the species   
+                if cell_key not in sim.aggregated_biomass[grid.species.species_code]:
+                    sim.aggregated_biomass[grid.species.species_code][cell_key] = 0.0
+                # Add the biomass of the cell to the aggregated_biomass for the species  
+                sim.aggregated_biomass[grid.species.species_code][cell_key] += cell.biomass
+
+        return update_biomass_statistics_pb2.UpdateBiomassStatisticsResponse(
+            experiment_id=request.experiment_id
+        )
+
+    def UpdateCatchDispositionStatistics(self, request : update_catch_disposition_statistics_pb2.UpdateCatchDispositionStatisticsRequest, context):
+        trace.get_current_span().set_attribute("experiment_id", request.experiment_id)
+        if not request.experiment_id in self.experiment_dictionary.keys():
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} not known.")
+
+        print(f"Update CatchDisposition for experiment {request.experiment_id} ")
+# Aggregate the catch data
+# Check if the year is complete
+# if so, add the catch of the species to the csv file
+        # print(request)  # for debugging purposes
+
+        sim = self.experiment_dictionary[request.experiment_id]
+
+        # Loop over every grid in Disposition_grids
+        for grid in request.catch_disposition_statistics_summary.disposition_grids_statistics:
+            # Check if the species is already in the aggregated_catch_dictionary
+            if grid.species.species_code not in sim.aggregated_catch_dictionary:
+                sim.aggregated_catch_dictionary[grid.species.species_code] = {}
+
+            # Loop over every cell in the grid
+            for cell in grid.disposition_cells_statistics:
+                cell_key = (cell.latitude, cell.longitude)
+                # Check if the cell is already in the aggregated_catch_dictionary for the species   
+                if cell_key not in sim.aggregated_catch_dictionary[grid.species.species_code]:
+                    sim.aggregated_catch_dictionary[grid.species.species_code][cell_key] = 0.0
+                
+                # Add the catch of the cell to the aggregated_catch_dictionary for the species  
+                sim.aggregated_catch_dictionary[grid.species.species_code][cell_key] += cell.gross_catch.mean                    
+
+        return update_catch_disposition_statistics_pb2.UpdateCatchDispositionStatisticsResponse(
+            experiment_id=request.experiment_id
+        )
+
+    def GetProtocolVersion(self, request: get_protocol_version_pb2.GetProtocolVersionRequest, context: grpc.ServicerContext):
+        return get_protocol_version_pb2.GetProtocolVersionResponse(
+            protocol_version=self.version
+        )
+
+    def _update_id_file(self, experiment_id: str, stocks: list[str], year: int):
         import csv
 
-        id_file_path = Path(__file__).parent.parent / "simulations" / simulation_id / "id_file.csv"
+        id_file_path = Path(__file__).parent.parent / "experiments" / experiment_id / "id_file.csv"
 
         if not id_file_path.exists():
-            print(f"id_file.csv not found for simulation {simulation_id}")
+            print(f"id_file.csv not found for experiment {experiment_id}")
             return
 
         # === NEW CHANGE ===
         # DETERMINE THE FIRST SIMULATED YEAR FROM catch_file.csv
-        catch_file_path = Path(__file__).parent.parent / "simulations" / simulation_id / "catch_file.csv"
+        catch_file_path = Path(__file__).parent.parent / "experiments" / experiment_id / "catch_file.csv"
         sim_start_year = None
 
         try:
@@ -431,10 +497,10 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
                 if years:
                     sim_start_year = min(years)
         except Exception as e:
-            print(f"⚠️ Could not determine simulation start year from catch_file.csv: {e}")
+            print(f"⚠️ Could not determine experiment start year from catch_file.csv for experiment {experiment_id}: {e}")
 
         if sim_start_year is None:
-            print(f"⚠️ Could not determine simulation start year. Falling back to final year {year}")
+            print(f"⚠️ Could not determine experiment start year for experiment {experiment_id}. Falling back to final year {year}")
             sim_start_year = year
 
         with open(id_file_path, newline='') as csvfile:
@@ -445,7 +511,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
         for row in reader:
             if row.get("Stock") in stocks:
                 # === NEW CHANGE ===
-                # SET THE FULL SIMULATION YEAR WINDOW
+                # SET THE FULL EXPERIMENT YEAR WINDOW
                 row["MinOfYear"] = str(sim_start_year)
                 row["StartYear"] = str(sim_start_year)
                 row["MaxOfYear"] = str(year)
@@ -457,17 +523,17 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             writer.writeheader()
             writer.writerows(updated_rows)
 
-        print(f"✅ id_file.csv updated with simulation years {sim_start_year}-{year} for stocks: {stocks}")
+        print(f"✅ id_file.csv updated with experiment years {sim_start_year}-{year} for stocks: {stocks}")
 
     # === NEW HELPER METHOD ===
     # THIS FORCES btype TO CPUE FOR ALL ROWS IN THE WORKING id_file.csv
-    def _force_btype_cpue(self, simulation_id: str):
+    def _force_btype_cpue(self, experiment_id: str):
         import csv
 
-        id_file_path = Path(__file__).parent.parent / "simulations" / simulation_id / "id_file.csv"
+        id_file_path = Path(__file__).parent.parent / "experiments" / experiment_id / "id_file.csv"
 
         if not id_file_path.exists():
-            print(f"⚠️ id_file.csv not found for simulation {simulation_id}")
+            print(f"⚠️ id_file.csv not found for experiment {experiment_id}")
             return
 
         with open(id_file_path, newline='', encoding='utf-8-sig') as csvfile:
@@ -475,11 +541,11 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             fieldnames = rows[0].keys() if rows else []
 
         if not fieldnames:
-            print(f"⚠️ id_file.csv is empty for simulation {simulation_id}")
+            print(f"⚠️ id_file.csv is empty for experiment {experiment_id}")
             return
 
         if "btype" not in fieldnames:
-            print(f"⚠️ id_file.csv has no 'btype' column for simulation {simulation_id}")
+            print(f"⚠️ id_file.csv has no 'btype' column for experiment {experiment_id}")
             return
 
         updated_count = 0
@@ -499,21 +565,21 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
     # USING THE HISTORICAL ASSESSMENT OUTPUT:
     # lcl.last.B_Bmsy / 2 -> stb.low
     # ucl.last.B_Bmsy / 2 -> stb.hi
-    def _update_id_file_stb_from_historical_output(self, simulation_id: str):
+    def _update_id_file_stb_from_historical_output(self, experiment_id: str):
         import csv
 
-        simulation_dir = Path(__file__).parent.parent / "simulations" / simulation_id
-        id_file_path = simulation_dir / "id_file.csv"
+        experiment_dir = Path(__file__).parent.parent / "experiments" / experiment_id
+        id_file_path = experiment_dir / "id_file.csv"
 
         if not id_file_path.exists():
-            print(f"⚠️ id_file.csv not found for simulation {simulation_id}")
+            print(f"⚠️ id_file.csv not found for experiment {experiment_id}")
             return
 
         # === FIND THE HISTORICAL OUTPUT CSV PRODUCED BY THE FIRST ASSESSMENT ===
-        candidate_files = sorted(simulation_dir.glob("*id_file_output_historical.csv"))
+        candidate_files = sorted(experiment_dir.glob("*id_file_output_historical.csv"))
 
         if not candidate_files:
-            print(f"⚠️ No historical id_file output found in {simulation_dir}")
+            print(f"⚠️ No historical id_file output found in {experiment_dir}")
             return
 
         historical_output_path = candidate_files[0]
@@ -590,7 +656,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             fieldnames = id_rows[0].keys() if id_rows else []
 
         if not fieldnames:
-            print(f"⚠️ id_file.csv is empty for simulation {simulation_id}")
+            print(f"⚠️ id_file.csv is empty for experiment {experiment_id}")
             return
 
         required_id_columns = {"Stock", "stb.low", "stb.hi"}
@@ -632,13 +698,13 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
     # THIS CREATES A DETAILED YEAR-BY-YEAR COMPARISON FILE
     # BETWEEN SIMULATED AND REAL CATCH (ct) AND BIOMASS (bt)
     # USING THE FULL OVERLAPPING PERIOD PER STOCK
-    def _create_catch_comparison_detailed(self, simulation_id: str):
+    def _create_catch_comparison_detailed(self, experiment_id: str):
         import csv
 
-        simulation_dir = Path(__file__).parent.parent / "simulations" / simulation_id
-        simulated_path = simulation_dir / "catch_file.csv"
-        original_path = simulation_dir / "catch_file_original.csv"
-        comparison_path = simulation_dir / "catch_comparison_detailed.csv"
+        experiment_dir = Path(__file__).parent.parent / "experiments" / experiment_id
+        simulated_path = experiment_dir / "catch_file.csv"
+        original_path = experiment_dir / "catch_file_original.csv"
+        comparison_path = experiment_dir / "catch_comparison_detailed.csv"
 
         if not simulated_path.exists():
             print(f"⚠️ Simulated catch file not found: {simulated_path}")
@@ -729,7 +795,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
         all_stocks = sorted(set(sim_by_stock.keys()) & set(real_by_stock.keys()))
 
         if not all_stocks:
-            print(f"⚠️ No overlapping stocks found between simulated and original catch files for {simulation_id}")
+            print(f"⚠️ No overlapping stocks found between simulated and original catch files for experiment {experiment_id}")
             return
 
         comparison_rows = []
@@ -802,7 +868,7 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             print(f"✅ Comparison rows created for stock {stock}: {matched_years} matched years ({overlap_start}-{overlap_end})")
 
         if not comparison_rows:
-            print(f"⚠️ No comparison rows created for simulation {simulation_id}")
+            print(f"⚠️ No comparison rows created for experiment {experiment_id}")
             return
 
         comparison_rows.sort(key=lambda x: (x["Stock"], x["yr"]))
@@ -821,8 +887,8 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
 
     # === HELPER METHOD ===
     # THIS RENAMES ONLY OUTPUT FILES, NOT CORE INPUT / CONFIG FILES
-    def _rename_outputs_historical(self, simulation_id: str):
-        simulation_dir = Path(__file__).parent.parent / "simulations" / simulation_id
+    def _rename_outputs_historical(self, experiment_id: str):
+        experiment_dir = Path(__file__).parent.parent / "experiments" / experiment_id
 
         protected_files = {
             "catch_file.csv",
@@ -833,13 +899,13 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
             "r2jags.bug",
         }
 
-        if not simulation_dir.exists():
-            print(f"⚠️ Simulation directory not found: {simulation_dir}")
+        if not experiment_dir.exists():
+            print(f"⚠️ Experiment directory not found: {experiment_dir}")
             return
 
         renamed_count = 0
 
-        for file_path in simulation_dir.iterdir():
+        for file_path in experiment_dir.iterdir():
             if not file_path.is_file():
                 continue
 
@@ -862,54 +928,54 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
 
     # === NEW HELPER METHOD ===
     # THIS RENAMES THE ORIGINAL HISTORICAL catch_file.csv
-    def _rename_first_catch_file_historical(self, simulation_id: str):
-        simulation_dir = Path(__file__).parent.parent / "simulations" / simulation_id
-        catch_file_path = simulation_dir / "catch_file.csv"
-        historical_catch_file_path = simulation_dir / "catch_file_historical.csv"
+    def _rename_first_catch_file_historical(self, experiment_id: str):
+        experiment_dir = Path(__file__).parent.parent / "experiments" / experiment_id
+        catch_file_path = experiment_dir / "catch_file.csv"
+        historical_catch_file_path = experiment_dir / "catch_file_historical.csv"
 
         if not catch_file_path.exists():
-            print(f"⚠️ catch_file.csv not found for simulation {simulation_id}")
+            print(f"⚠️ catch_file.csv not found for experiment {experiment_id}")
             return
 
         if historical_catch_file_path.exists():
-            print(f"⚠️ catch_file_historical.csv already exists for simulation {simulation_id}. Skipping rename.")
+            print(f"⚠️ catch_file_historical.csv already exists for experiment {experiment_id}. Skipping rename.")
             return
 
         try:
             catch_file_path.rename(historical_catch_file_path)
-            print(f"✅ Renamed catch_file.csv -> catch_file_historical.csv for simulation {simulation_id}")
+            print(f"✅ Renamed catch_file.csv -> catch_file_historical.csv for experiment {experiment_id}")
         except Exception as e:
             print(f"❌ Failed to rename catch_file.csv to catch_file_historical.csv: {e}")
 
     # === NEW HELPER METHOD ===
     # THIS KEEPS A HISTORICAL COPY OF THE FILTERED id_file.csv
     # NOTE: WE DO NOT RENAME THE WORKING id_file.csv, BECAUSE PHASE 2 STILL NEEDS IT
-    def _create_historical_id_file_copy(self, simulation_id: str):
-        simulation_dir = Path(__file__).parent.parent / "simulations" / simulation_id
-        id_file_path = simulation_dir / "id_file.csv"
-        historical_id_file_path = simulation_dir / "id_file_historical.csv"
+    def _create_historical_id_file_copy(self, experiment_id: str):
+        experiment_dir = Path(__file__).parent.parent / "experiments" / experiment_id
+        id_file_path = experiment_dir / "id_file.csv"
+        historical_id_file_path = experiment_dir / "id_file_historical.csv"
 
         if not id_file_path.exists():
-            print(f"⚠️ id_file.csv not found for simulation {simulation_id}")
+            print(f"⚠️ id_file.csv not found for experiment {experiment_id}")
             return
 
         if historical_id_file_path.exists():
-            print(f"⚠️ id_file_historical.csv already exists for simulation {simulation_id}. Skipping copy.")
+            print(f"⚠️ id_file_historical.csv already exists for experiment {experiment_id}. Skipping copy.")
             return
 
         try:
             shutil.copy(id_file_path, historical_id_file_path)
-            print(f"✅ Created historical copy: id_file.csv -> id_file_historical.csv for simulation {simulation_id}")
+            print(f"✅ Created historical copy: id_file.csv -> id_file_historical.csv for experiment {experiment_id}")
         except Exception as e:
-            print(f"❌ Failed to create id_file_historical.csv: {e}")
+            print(f"❌ Failed to create id_file_historical.csv for experiment {experiment_id}: {e}")
 
     # === NEW HELPER METHOD ===
     # THIS CREATES A NEW EMPTY catch_file.csv FOR SIMULATED DATA ONLY
-    def _create_empty_catch_file_for_simulation(self, simulation_id: str):
+    def _create_empty_catch_file_for_experiment(self, experiment_id: str):
         import csv
 
-        simulation_dir = Path(__file__).parent.parent / "simulations" / simulation_id
-        catch_file_path = simulation_dir / "catch_file.csv"
+        experiment_dir = Path(__file__).parent.parent / "experiments" / experiment_id
+        catch_file_path = experiment_dir / "catch_file.csv"
 
         try:
             with open(catch_file_path, mode='w', newline='') as csvfile:
@@ -919,7 +985,3 @@ class WorkflowService(workflow_service_pb2_grpc.WorkflowServiceServicer):
         except Exception as e:
             print(f"❌ Failed to create new empty catch_file.csv for simulated data: {e}")
 
-    def GetProtocolVersion(self, request: workflow_service_pb2.GetProtocolVersionRequest, context: grpc.ServicerContext):
-        return workflow_service_pb2.GetProtocolVersionResponse(
-            protocol_version=self.version
-        )

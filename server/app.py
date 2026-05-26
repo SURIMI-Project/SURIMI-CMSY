@@ -5,10 +5,8 @@ from otlp_tracing import configure_oltp_grpc_tracing
 from concurrent import futures
 from server.exception_metadata_interceptor import ExceptionMetadataInterceptor
 from server.version_metadata_interceptor import VersionMetadataInterceptor
-from server.catch_consumer_service import CatchConsumerService
-from server.workflow_service import WorkflowService
-from server.ecology_consumer_service import EcologyConsumerService 
-from surimi.v1 import catch_consumer_service_pb2_grpc, workflow_service_pb2_grpc, ecology_consumer_service_pb2_grpc
+from server.StockAssesment import StockAssessmentService
+from surimi.v1 import stock_assesment_service_pb2_grpc
 from vault_service import VaultService
 from dotenv import load_dotenv
 from importlib.metadata import version, PackageNotFoundError
@@ -16,8 +14,8 @@ from importlib.metadata import version, PackageNotFoundError
 def serve():
     load_dotenv()  # Load environment variables from .env file
 
-    # Simulation storage shared across services
-    simulation_dictionary = {}
+    # Experiment storage shared across services
+    experiment_dictionary = {}
 
     VaultService.LoadVaultSecretsInEnvironmentVariables()  # Load secrets from Vault into environment variables
 
@@ -49,14 +47,8 @@ def serve():
         ]
     )
     
-    workflow_service = WorkflowService(tracer, simulation_dictionary, version)  # Instantiate the workflow service
-    workflow_service_pb2_grpc.add_WorkflowServiceServicer_to_server(workflow_service, server)
-
-    ecology_consumer_service = EcologyConsumerService(tracer, simulation_dictionary)  # Instantiate the ecology service
-    ecology_consumer_service_pb2_grpc.add_EcologyConsumerServiceServicer_to_server(ecology_consumer_service, server)
-
-    catch_consumer_service = CatchConsumerService(tracer, simulation_dictionary)  # Instantiate the catch consumer service
-    catch_consumer_service_pb2_grpc.add_CatchConsumerServiceServicer_to_server(catch_consumer_service, server)
+    stock_assessment_service = StockAssessmentService(tracer, experiment_dictionary, version)  # Instantiate the stock assessment service
+    stock_assesment_service_pb2_grpc.add_StockAssesmentServiceServicer_to_server(stock_assessment_service, server)
 
     # Bind the server to a port
     server.add_insecure_port("[::]:5021")
