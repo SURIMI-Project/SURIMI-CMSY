@@ -25,14 +25,13 @@ options(repos = c(CRAN = "https://cloud.r-project.org"))
 
 # install.packages("rjags",dependencies=T)
 
-# Automatic installation of missing packages
-list.of.packages <- c("R2jags","coda","parallel","foreach","doParallel","gplots","mvtnorm","neuralnet","conicfit","promises","tinytex")
-new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
-if(length(new.packages)) install.packages(new.packages)
-
-# snpar is not available on CRAN anymore; install from GitHub if missing
-if (!("snpar" %in% installed.packages()[,"Package"])) {
-  if (!("remotes" %in% installed.packages()[,"Package"])) install.packages("remotes")
+# Automatically install any missing packages.
+# Uses requireNamespace() instead of installed.packages() — much faster when packages are already present.
+for (pkg in c("R2jags","coda","parallel","foreach","doParallel","gplots","mvtnorm","neuralnet","conicfit","promises","tinytex")) {
+  if (!requireNamespace(pkg, quietly = TRUE)) install.packages(pkg)
+}
+if (!requireNamespace("snpar", quietly = TRUE)) {
+  if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
   remotes::install_github("debinqiu/snpar", upgrade = "never")
 }
 
@@ -44,16 +43,17 @@ library(snpar)
 library(neuralnet)
 library(conicfit)
 library(tinytex)
+library(parallel)  # FAST: for mclapply stock-level parallelism
 
 #-----------------------------------------
 # Some general settings ----
 #-----------------------------------------
-# set.seed(999) # use for comparing results between runs
+set.seed(999) # use for comparing results between runs
 rm(list=ls(all=FALSE)) # clear previous variables etc
 options(digits=3) # displays all numbers with three significant digits as default
 graphics.off() # close graphics windows from previous sessions
 FullSchaefer <- T    # initialize variable; automatically set to TRUE if enough abundance data are available
-n.chains     <- 2 # number of chains to be used in JAGS, default = 2
+n.chains     <- 1 # FAST: 1 chain per stock — parallelism happens at stock level instead
 #setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) # set working directory to source file location
 
 #-----------------------------------------
@@ -88,17 +88,17 @@ n            <- 5000 # number of points in multivariate cloud in graph panel (b)
 ni           <- 3 # iterations for r-k-startbiomass combinations, to test different variability patterns; no improvement seen above 3
 nab          <- 5 # recommended=5; minimum number of years with abundance data to run BSM
 bw           <- 3 # default bandwidth to be used by ksmooth() for catch data
-mgraphs      <- T # set to TRUE to produce additional graphs for management
+mgraphs      <- F # FAST: disabled — skips MAN.jpg
 e.creep.line <- T # set to TRUE to display uncorrected CPUE in biomass graph
-kobe.plot    <- T # set to TRUE to produce additional kobe status plot; management graph needs to be TRUE for Kobe to work
+kobe.plot    <- F # FAST: disabled — skips KOBE.jpg
 BSMfits.plot <- F # set to TRUE to plot fit diagnostics for BSM
 pp.plot      <- F # set to TRUE to plot Posterior and Prior distributions for CMSY and BSM
-rk.diags     <- T #><>MSY set to TRUE to plot diagnostic plot for r-k space
+rk.diags     <- F # FAST: disabled — skips rk_Diags.jpg
 retros       <- F # set to TRUE to enable retrospective analysis (1-3 years less in the time series)
-save.plots   <- T # set to TRUE to save graphs to JPEG files
+save.plots   <- F # FAST: disabled — skips all JPEG saving
 close.plots  <- T # set to TRUE to close on-screen plots after they are saved, to avoid "too many open devices" error in batch-processing
 write.output <- T # set to TRUE if table with results in output file is wanted; expects years 2004-2014 to be available
-write.pdf    <- T # set to TRUE if PDF output of results is wanted. See more instructions at end of code.
+write.pdf    <- F # FAST: disabled — skips slow LaTeX/PDF generation
 select.yr    <- NA # option to display F, B, F/Fmsy and B/Bmsy for a certain year; default NA
 write.rdata  <- F #><>HW write R data file
 
@@ -123,7 +123,8 @@ mvn   <- function(n,mean.log.r,sd.log.r,mean.log.k,sd.log.k) {
 # Function to run Bayesian Schaefer Model (BSM)
 #-------------------------------------------------------------
 bsm   <- function(ct,btj,nyr,prior.r,prior.k,startbio,q.priorj,
-                  init.q,init.r,init.k,pen.bk,pen.F,b.yrs,b.prior,CV.C,CV.cpue,nbk,rk.cor,cmsyjags) {
+                  init.q,init.r,init.k,pen.bk,pen.F,b.yrs,b.prior,CV.C,CV.cpue,nbk,rk.cor,cmsyjags,
+                  model_file="r2jags.bug") { # FAST: per-stock model file avoids parallel race condition
   #><> convert b.prior ranges into beta priors
   bk.beta = beta.prior(b.prior)
 
@@ -241,18 +242,20 @@ bsm   <- function(ct,btj,nyr,prior.r,prior.k,startbio,q.priorj,
 } "    # end of JAGS model
 
   # Write JAGS model to file ----
-  cat(Model, file="r2jags.bug")
+  cat(Model, file=model_file)
 
   #><>MSY: change to lognormal inits (better)
-  j.inits <- function(){list("log.rk"=c(rnorm(1,mean=log(init.r),sd=0.2),rnorm(1,mean=log(init.k),sd=0.1)),
-                             "q"=rlnorm(1,mean=log(init.q),sd=0.2),"itau2"=1000,"isigma2"=1000)}
+  # FAST: explicitly capture init values so j.inits closure works with jags() (jags.parallel serialised these automatically)
+  .iq <- init.q; .ir <- init.r; .ik <- init.k
+  j.inits <- function(){list("log.rk"=c(rnorm(1,mean=log(.ir),sd=0.2),rnorm(1,mean=log(.ik),sd=0.1)),
+                             "q"=rlnorm(1,mean=log(.iq),sd=0.2),"itau2"=1000,"isigma2"=1000)}
   # run model ----
-  jags_outputs <- jags.parallel(data=jags.data,
-                                working.directory=NULL, inits=j.inits,
-                                parameters.to.save=jags.save.params,
-                                model.file="r2jags.bug", n.chains = n.chains,
-                                n.burnin = 30000, n.thin = 10,
-                                n.iter = 60000)
+  jags_outputs <- jags(data=jags.data, # FAST: jags() instead of jags.parallel() — no cluster overhead with n.chains=1
+                       working.directory=NULL, inits=j.inits,
+                       parameters.to.save=jags.save.params,
+                       model.file=model_file, n.chains = n.chains,
+                       n.burnin = 30000, n.thin = 10,
+                       n.iter = 60000)
   return(jags_outputs)
 }
 
@@ -355,7 +358,7 @@ cat("-------------------------------------------\n")
 # Read data and assign to vectors
 #------------------------------------------
 # create headers for data table file
-if(write.output==T){
+if(write.output==T && (!file.exists(outfile) || file.size(outfile) == 0)){ # FAST: only write headers when file is new or empty
   outheaders = data.frame("Group","Region", "Subregion","Name","SciName","Stock",
                           "start.yr","end.yr","start.yr.new","btype",
                           "N bt","start.yr.cpue","end.yr.cpue","min.cpue","max.cpue","min.yr.cpue","max.yr.cpue",
@@ -422,9 +425,22 @@ if(is.na(stocks[1])==TRUE){
   # stocks         <- as.character(cinfo$Stock[cinfo$btype!="None" & cinfo$Stock>"Squa_aca_BlackSea"]) # Analyze stocks by criteria in ID file
 }
 
-# analyze one stock after the other...
-for(stock in stocks) {
+t_script_start <- Sys.time() # FAST: timing — overall script start
 
+# FAST: determine number of cores
+# mclapply uses fork which is not supported on Windows — force n_cores=1 there
+# On Linux/Mac (Docker) it will run stocks in parallel
+if (.Platform$OS.type == "windows") {
+  n_cores <- 1L
+  cat("Windows detected — running", length(stocks), "stocks sequentially\n")
+} else {
+  n_cores <- max(1L, detectCores() - 1L)
+  cat("Running", length(stocks), "stocks in parallel across", n_cores, "cores\n")
+}
+
+stock_outputs <- mclapply(stocks, mc.cores = n_cores, FUN = function(stock) {
+
+  t_stock_start <- Sys.time() # FAST: timing — per-stock start
   cat("Processing",stock,",", as.character(cinfo$ScientificName[cinfo$Stock==stock]),"\n")
 
   #retrospective analysis
@@ -942,8 +958,12 @@ if (btype == "biomass" | btype == "CPUE") {
 # Create JPEG file (off-screen)
 
 filename_silent <- paste(gsub(":","",gsub("/","-",stock)),"_AN.jpg",sep="")
-jpeg(filename = filename_silent,
-     width = 1024, height = 768, units = "px", res = 120, quality = 95)
+# FAST: only open a real jpeg device when save.plots is TRUE; otherwise discard
+if(save.plots) {
+  jpeg(filename = filename_silent, width = 1024, height = 768, units = "px", res = 120, quality = 95)
+} else {
+  pdf(NULL) # null device — plotting code runs but nothing is written to disk
+}
 
 # Plot without opening a window
 par(mfrow=c(2,3), mar=c(5.1,4.5,4.1,2.1))
@@ -1002,10 +1022,16 @@ if(substr(id_file,1,3)=="Sim") lines(x=yr, y=rep(true.MSY, length(yr)), lty="das
 
   cat("Running MCMC analysis with only catch data....\n")
 
+  # FAST: unique model file per stock to avoid parallel write collisions
+  model_file <- paste0("r2jags_", gsub("[^A-Za-z0-9]", "_", stock), ".bug")
+
   # call Schaefer model function
+  t_cmsy_start <- Sys.time() # FAST: timing — CMSY++ JAGS start
   jags_cmsy <- bsm(ct=ct,btj=bt.cmsy,nyr=nyr,prior.r=prior.r,prior.k=prior.k,startbio=startbio,q.priorj=q.prior.cmsy,
                       init.q=init.q.cmsy,init.r=init.r,init.k=init.k,pen.bk=pen.bk,pen.F=pen.F,b.yrs=b.yrs,
-                      b.prior=b.prior,CV.C=CV.C,CV.cpue=CV.cpue,nbk=nbk,rk.cor=rk.cor,cmsyjags=TRUE)
+                      b.prior=b.prior,CV.C=CV.C,CV.cpue=CV.cpue,nbk=nbk,rk.cor=rk.cor,cmsyjags=TRUE,
+                      model_file=model_file)
+  cat(sprintf("  [TIMING] %s — CMSY++ JAGS run: %.1f sec\n", stock, as.numeric(Sys.time() - t_cmsy_start, units="secs"))) # FAST: timing
 
   #-----------------------------------------------
   # Get CMSY++ results
@@ -1118,12 +1144,15 @@ if(substr(id_file,1,3)=="Sim") lines(x=yr, y=rep(true.MSY, length(yr)), lty="das
       q.1           <- mean.max.bt/prior.k[2]
       q.2           <- mean.max.bt/(0.25*prior.k[1])
       q.prior       <- c(q.1,q.2)
-      q.init        <- mean(q.prior) }
+      init.q        <- mean(q.prior) } # FAST: renamed q.init → init.q to match biomass branch and bsm() call
 
     # call Schaefer model function
+    t_bsm_start <- Sys.time() # FAST: timing — BSM JAGS start
     jags_bsm <- bsm(ct=ct,btj=bt,nyr=nyr,prior.r=prior.r,prior.k=prior.k,startbio=startbio,q.priorj=q.prior,
                         init.q=init.q,init.r=init.r,init.k=init.k,pen.bk=pen.bk,pen.F=pen.F,b.yrs=b.yrs,
-                        b.prior=b.prior,CV.C=CV.C,CV.cpue=CV.cpue,nbk=nbk,rk.cor=rk.cor,cmsyjags=FALSE)
+                        b.prior=b.prior,CV.C=CV.C,CV.cpue=CV.cpue,nbk=nbk,rk.cor=rk.cor,cmsyjags=FALSE,
+                        model_file=model_file)
+    cat(sprintf("  [TIMING] %s — BSM JAGS run: %.1f sec\n", stock, as.numeric(Sys.time() - t_bsm_start, units="secs"))) # FAST: timing
 
     # --------------------------------------------------------------
     # Results from BSM Schaefer - ><>HW now consistent with CMSY++
@@ -2298,8 +2327,14 @@ if (kobe.plot == TRUE) {
                         bt.out[61],bt.out[62],bt.out[63],bt.out[64],bt.out[65],bt.out[66],bt.out[67],bt.out[68],bt.out[69],bt.out[70],  # 2010-2019
                         bt.out[71],bt.out[72],bt.out[73],bt.out[74],bt.out[75],bt.out[76],bt.out[77],bt.out[78],bt.out[79],bt.out[80],bt.out[81]) # 2020-2030
 
-    write.table(output, file=outfile, append = T, sep = ",",
-                dec = ".", row.names = FALSE, col.names = FALSE)
+    # FAST: return row instead of writing — collected and written once after mclapply
+    cat(sprintf("  [TIMING] %s — total stock time: %.1f sec\n", stock, as.numeric(Sys.time() - t_stock_start, units="secs"))) # FAST: timing
+    file.remove(model_file) # clean up per-stock JAGS model file
+    return(output)
+  } else {
+    cat(sprintf("  [TIMING] %s — total stock time: %.1f sec (no output)\n", stock, as.numeric(Sys.time() - t_stock_start, units="secs"))) # FAST: timing
+    file.remove(model_file)
+    return(NULL)
   }
 
 
@@ -2510,7 +2545,20 @@ if (kobe.plot == TRUE) {
 	  if(close.plots==T) graphics.off() # close on-screen graphics windows after files are saved
 	} #retrospective analysis plots - end
 
-} # end of stocks loop
+}) # FAST: end of mclapply — stock_outputs is a list of output data frames
+
+# FAST: write all stock results to the output file in one pass
+if(write.output == T) {
+  for(res in stock_outputs) {
+    if(!is.null(res) && !inherits(res, "try-error")) {
+      write.table(res, file=outfile, append=T, sep=",",
+                  dec=".", row.names=FALSE, col.names=FALSE)
+    }
+  }
+  cat("Results written to", outfile, "\n")
+}
+
+cat(sprintf("\n[TIMING] Total script time: %.1f sec\n", as.numeric(Sys.time() - t_script_start, units="secs"))) # FAST: timing — script end
 
 
 
