@@ -7,21 +7,18 @@ from pathlib import Path
 import shutil
 from server.division_lookup import get_division
 from server.species_lookup import get_common_name
-from opentelemetry import trace
 
 from server.common_functions import log_and_abort
 from server.r_scriptrunner import R_ScriptRunner
 
 class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServiceServicer):
-    def __init__(self, tracer, experiment_dictionary: dict[str, Simulation], version: str):
+    def __init__(self, experiment_dictionary: dict[str, Simulation], version: str):
         self.experiment_dictionary = experiment_dictionary  # Will hold the current simulation instance
-        self.tracer = tracer  # Store the tracer instance
         self.version = version  # Store the version
 
     def InitialiseExperiment(self, request: initialise_experiment_pb2.InitialiseExperimentRequest, context):
-        trace.get_current_span().set_attribute("experiment_id", request.experiment_id)
         print("InitialiseRequest fields:", [f.name for f in request.DESCRIPTOR.fields])
-        print("✅ CONTRACT FILTERING ENABLED (WORKFLOW_SERVICE.PY UPDATED)")
+        print("[OK] CONTRACT FILTERING ENABLED (WORKFLOW_SERVICE.PY UPDATED)")
 
         if request.experiment_id in self.experiment_dictionary.keys():
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} already exists.")
@@ -86,7 +83,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
         catch_file_original_path = output_directory / "catch_file_original.csv"
         id_file_path = output_directory / "id_file.csv"
 
-        print(f"✅ Contract species ({len(contract_codes)}): {', '.join(sorted(contract_codes))}")
+        print(f"[OK] Contract species ({len(contract_codes)}): {', '.join(sorted(contract_codes))}")
 
         # ---- FILTER id_file.csv (Stock column is FAO 3-alpha)
         with open(id_file_path, newline="", encoding="utf-8-sig") as f:
@@ -115,7 +112,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
             writer.writeheader()
             writer.writerows(id_filtered_rows)
 
-        print(f"🧹 id_file.csv filtered to contract species (removed {removed_id} non-contract stocks).")
+        print(f"[CLEAN] id_file.csv filtered to contract species (removed {removed_id} non-contract stocks).")
 
         # IMPORTANT:
         # DO NOT FORCE btype TO CPUE HERE.
@@ -151,7 +148,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
             writer = csv.writer(f)
             writer.writerows(filtered_catch_rows)
 
-        print(f"🧹 catch_file.csv filtered to contract species (removed {removed_catch} non-contract rows).")
+        print(f"[CLEAN] catch_file.csv filtered to contract species (removed {removed_catch} non-contract rows).")
 
         # ---- FILTER catch_file_original.csv (full real time series kept for comparison)
         with open(catch_file_original_path, newline="", encoding="utf-8-sig") as f:
@@ -183,7 +180,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
             writer = csv.writer(f)
             writer.writerows(filtered_original_rows)
 
-        print(f"🧹 catch_file_original.csv filtered to contract species (removed {removed_original} non-contract rows).")
+        print(f"[CLEAN] catch_file_original.csv filtered to contract species (removed {removed_original} non-contract rows).")
 
         # ---- WARN ABOUT MISSING CONTRACT SPECIES (DO NOT ABORT)
         missing_in_id = sorted(contract_codes - present_id)
@@ -191,15 +188,15 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
         missing_in_original = sorted(contract_codes - present_original)
 
         if missing_in_id:
-            print(f"⚠️ Contract species missing from id_file.csv (continuing): {', '.join(missing_in_id)}")
+            print(f"[WARNING] Contract species missing from id_file.csv (continuing): {', '.join(missing_in_id)}")
         if missing_in_catch:
-            print(f"⚠️ Contract species missing from catch_file.csv (continuing): {', '.join(missing_in_catch)}")
+            print(f"[WARNING] Contract species missing from catch_file.csv (continuing): {', '.join(missing_in_catch)}")
         if missing_in_original:
-            print(f"⚠️ Contract species missing from catch_file_original.csv (continuing): {', '.join(missing_in_original)}")
+            print(f"[WARNING] Contract species missing from catch_file_original.csv (continuing): {', '.join(missing_in_original)}")
 
         # NOTE: The effective species that will run (present in BOTH working files)
         effective_species = sorted((present_id & present_catch) & contract_codes)
-        print(f"✅ Effective species to run (present in both files): {len(effective_species)}")
+        print(f"[OK] Effective species to run (present in both files): {len(effective_species)}")
 
         # OPTIONAL: quick sanity peek (first few stocks)
         try:
@@ -249,7 +246,6 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
         )
 
     def ExperimentStep(self, request: experiment_step_pb2.ExperimentStepRequest, context):
-        trace.get_current_span().set_attribute("experiment_id", request.experiment_id)
         if request.experiment_id not in self.experiment_dictionary:
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} not known.")
 
@@ -269,7 +265,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
             catch_file_path = Path(__file__).parent.parent.resolve() / "experiments" / request.experiment_id / "catch_file.csv"
 
             if not sim.aggregated_catch_dictionary:
-                print("⚠️ No aggregated catch data found. Writing NA entries to catch_file.csv")
+                print("[WARNING] No aggregated catch data found. Writing NA entries to catch_file.csv")
                 id_file_path = Path(__file__).parent.parent / "experiments" / request.experiment_id / "id_file.csv"
                 try:
                     import csv
@@ -280,7 +276,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
                             stock = row.get("Stock")
                             if stock and stock.strip():
                                 clean = stock.strip()
-                                print(f"📋 Adding stock row: '{clean}'")
+                                print(f"[NOTE] Adding stock row: '{clean}'")
                                 stock_names.append(clean)
 
                     # === NEW CHANGE ===
@@ -293,14 +289,14 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
                         writer = csv.writer(csvfile)
                         count = 0
                         for stock_name in stock_names:
-                            print(f"📝 Writing: [{stock_name}, {current_year}, NA, NA]")
+                            print(f"[NOTE] Writing: [{stock_name}, {current_year}, NA, NA]")
                             writer.writerow([stock_name, current_year, "NA", "NA"])
                             count += 1
                         csvfile.flush()
                         os.fsync(csvfile.fileno())
-                        print(f"✅ Wrote {count} NA rows to {catch_file_path}")
+                        print(f"[OK] Wrote {count} NA rows to {catch_file_path}")
                 except Exception as e:
-                    print(f"❌ Failed to write NA entries to catch_file.csv: {e}")
+                    print(f"[ERROR] Failed to write NA entries to catch_file.csv: {e}")
                 return experiment_step_pb2.ExperimentStepResponse(
                     experiment_id=request.experiment_id
                 )
@@ -333,7 +329,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
                         sim.last_written_stock_names.append(stock_label)
 
                         if catch_value > 0:
-                            print(f"✅ {stock_label}: {round(catch_value, 2)} kg in {current_year}")
+                            print(f"[OK] {stock_label}: {round(catch_value, 2)} kg in {current_year}")
 
             sim.aggregated_catch_dictionary.clear()
             sim.aggregated_biomass.clear()
@@ -346,7 +342,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
                 written_stocks = set(sim.last_written_stock_names)
                 missing_stocks = all_stocks - written_stocks
                 if missing_stocks:
-                    print(f"➕ Appending NA rows for {len(missing_stocks)} stocks not written yet")
+                    print(f"[ADD] Appending NA rows for {len(missing_stocks)} stocks not written yet")
                     with open(catch_file_path, mode='a', newline='') as csvfile:
                         import os
                         writer = csv.writer(csvfile)
@@ -354,16 +350,15 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
                             writer.writerow([stock_name, current_year, "NA", "NA"])
                         csvfile.flush()
                         os.fsync(csvfile.fileno())
-                        print(f"✅ Appended {len(missing_stocks)} NA rows to {catch_file_path}")
+                        print(f"[OK] Appended {len(missing_stocks)} NA rows to {catch_file_path}")
             except Exception as e:
-                print(f"❌ Failed to append missing NA rows: {e}")
+                print(f"[ERROR] Failed to append missing NA rows: {e}")
 
         return experiment_step_pb2.ExperimentStepResponse(
             experiment_id=request.experiment_id
         )
 
     def FinaliseExperiment(self, request: finalise_experiment_pb2.FinaliseExperimentRequest, context):
-        trace.get_current_span().set_attribute("experiment_id", request.experiment_id)
         if request.experiment_id not in self.experiment_dictionary:
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} not known.")
 
@@ -377,9 +372,9 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
                 sim.last_written_stock_names,
                 sim.last_written_year
             )
-            print(f"✅ Finalise: id_file.csv updated for experiment {request.experiment_id}")
+            print(f"[OK] Finalise: id_file.csv updated for experiment {request.experiment_id}")
         else:
-            print(f"⚠️ Finalise: No stock data found to update id_file.csv for experiment {request.experiment_id}")
+            print(f"[WARNING] Finalise: No stock data found to update id_file.csv for experiment {request.experiment_id}")
 
         # === NEW CHANGE ===
         # CREATE DETAILED YEAR-BY-YEAR CATCH COMPARISON
@@ -394,7 +389,6 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
         )
 
     def CancelExperiment(self, request: cancel_experiment_pb2.CancelExperimentRequest, context):
-        trace.get_current_span().set_attribute("experiment_id", request.experiment_id)
         if request.experiment_id not in self.experiment_dictionary:
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} not known.")
 
@@ -405,7 +399,6 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
         )
 
     def UpdateBiomassStatistics(self, request : update_biomass_statistics_pb2.UpdateBiomassStatisticsRequest, context):
-        trace.get_current_span().set_attribute("experiment_id", request.experiment_id)
         if request.experiment_id not in self.experiment_dictionary:
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} not known.")
 
@@ -434,7 +427,6 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
         )
 
     def UpdateCatchDispositionStatistics(self, request : update_catch_disposition_statistics_pb2.UpdateCatchDispositionStatisticsRequest, context):
-        trace.get_current_span().set_attribute("experiment_id", request.experiment_id)
         if not request.experiment_id in self.experiment_dictionary.keys():
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} not known.")
 
@@ -497,10 +489,10 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
                 if years:
                     sim_start_year = min(years)
         except Exception as e:
-            print(f"⚠️ Could not determine experiment start year from catch_file.csv for experiment {experiment_id}: {e}")
+            print(f"[WARNING] Could not determine experiment start year from catch_file.csv for experiment {experiment_id}: {e}")
 
         if sim_start_year is None:
-            print(f"⚠️ Could not determine experiment start year for experiment {experiment_id}. Falling back to final year {year}")
+            print(f"[WARNING] Could not determine experiment start year for experiment {experiment_id}. Falling back to final year {year}")
             sim_start_year = year
 
         with open(id_file_path, newline='') as csvfile:
@@ -523,7 +515,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
             writer.writeheader()
             writer.writerows(updated_rows)
 
-        print(f"✅ id_file.csv updated with experiment years {sim_start_year}-{year} for stocks: {stocks}")
+        print(f"[OK] id_file.csv updated with experiment years {sim_start_year}-{year} for stocks: {stocks}")
 
     # === NEW HELPER METHOD ===
     # THIS FORCES btype TO CPUE FOR ALL ROWS IN THE WORKING id_file.csv
@@ -533,7 +525,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
         id_file_path = Path(__file__).parent.parent / "experiments" / experiment_id / "id_file.csv"
 
         if not id_file_path.exists():
-            print(f"⚠️ id_file.csv not found for experiment {experiment_id}")
+            print(f"[WARNING] id_file.csv not found for experiment {experiment_id}")
             return
 
         with open(id_file_path, newline='', encoding='utf-8-sig') as csvfile:
@@ -541,11 +533,11 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
             fieldnames = rows[0].keys() if rows else []
 
         if not fieldnames:
-            print(f"⚠️ id_file.csv is empty for experiment {experiment_id}")
+            print(f"[WARNING] id_file.csv is empty for experiment {experiment_id}")
             return
 
         if "btype" not in fieldnames:
-            print(f"⚠️ id_file.csv has no 'btype' column for experiment {experiment_id}")
+            print(f"[WARNING] id_file.csv has no 'btype' column for experiment {experiment_id}")
             return
 
         updated_count = 0
@@ -558,7 +550,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
             writer.writeheader()
             writer.writerows(rows)
 
-        print(f"✅ Forced btype='CPUE' for {updated_count} rows in id_file.csv")
+        print(f"[OK] Forced btype='CPUE' for {updated_count} rows in id_file.csv")
 
     # === NEW HELPER METHOD ===
     # THIS UPDATES THE WORKING id_file.csv FOR PHASE 2
@@ -572,25 +564,25 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
         id_file_path = experiment_dir / "id_file.csv"
 
         if not id_file_path.exists():
-            print(f"⚠️ id_file.csv not found for experiment {experiment_id}")
+            print(f"[WARNING] id_file.csv not found for experiment {experiment_id}")
             return
 
         # === FIND THE HISTORICAL OUTPUT CSV PRODUCED BY THE FIRST ASSESSMENT ===
         candidate_files = sorted(experiment_dir.glob("*id_file_output_historical.csv"))
 
         if not candidate_files:
-            print(f"⚠️ No historical id_file output found in {experiment_dir}")
+            print(f"[WARNING] No historical id_file output found in {experiment_dir}")
             return
 
         historical_output_path = candidate_files[0]
-        print(f"✅ Using historical assessment output: {historical_output_path.name}")
+        print(f"[OK] Using historical assessment output: {historical_output_path.name}")
 
         # === READ THE HISTORICAL OUTPUT ===
         with open(historical_output_path, newline='', encoding='utf-8-sig') as csvfile:
             hist_reader = csv.DictReader(csvfile)
 
             if not hist_reader.fieldnames:
-                print(f"⚠️ Historical output file has no header: {historical_output_path}")
+                print(f"[WARNING] Historical output file has no header: {historical_output_path}")
                 return
 
             required_hist_columns = {"Stock", "lcl.last.B_Bmsy", "ucl.last.B_Bmsy"}
@@ -598,7 +590,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
 
             if missing_hist_columns:
                 print(
-                    f"⚠️ Historical output missing required columns: {', '.join(sorted(missing_hist_columns))}. "
+                    f"[WARNING] Historical output missing required columns: {', '.join(sorted(missing_hist_columns))}. "
                     f"Found columns: {hist_reader.fieldnames}"
                 )
                 return
@@ -623,19 +615,19 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
 
                     # KEEP VALUES IN VALID B/k RANGE
                     if stb_low <= 0 or stb_hi <= 0:
-                        print(f"⚠️ Invalid converted stb values for {stock}: {stb_low}, {stb_hi}. Skipping.")
+                        print(f"[WARNING] Invalid converted stb values for {stock}: {stb_low}, {stb_hi}. Skipping.")
                         continue
 
                     if stb_low >= stb_hi:
-                        print(f"⚠️ Converted stb.low >= stb.hi for {stock}: {stb_low}, {stb_hi}. Skipping.")
+                        print(f"[WARNING] Converted stb.low >= stb.hi for {stock}: {stb_low}, {stb_hi}. Skipping.")
                         continue
 
                     if stb_hi > 1:
-                        print(f"⚠️ Converted stb.hi > 1 for {stock}: {stb_hi}. Clamping to 1.0")
+                        print(f"[WARNING] Converted stb.hi > 1 for {stock}: {stb_hi}. Clamping to 1.0")
                         stb_hi = 1.0
 
                     if stb_low >= stb_hi:
-                        print(f"⚠️ Converted and clamped stb.low >= stb.hi for {stock}: {stb_low}, {stb_hi}. Skipping.")
+                        print(f"[WARNING] Converted and clamped stb.low >= stb.hi for {stock}: {stb_low}, {stb_hi}. Skipping.")
                         continue
 
                     historical_map[stock] = {
@@ -644,10 +636,10 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
                     }
 
                 except (TypeError, ValueError):
-                    print(f"⚠️ Could not convert historical B/Bmsy values for {stock}: {lcl_val}, {ucl_val}")
+                    print(f"[WARNING] Could not convert historical B/Bmsy values for {stock}: {lcl_val}, {ucl_val}")
 
         if not historical_map:
-            print(f"⚠️ No valid stock values found in historical output: {historical_output_path.name}")
+            print(f"[WARNING] No valid stock values found in historical output: {historical_output_path.name}")
             return
 
         # === READ THE WORKING id_file.csv ===
@@ -656,7 +648,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
             fieldnames = id_rows[0].keys() if id_rows else []
 
         if not fieldnames:
-            print(f"⚠️ id_file.csv is empty for experiment {experiment_id}")
+            print(f"[WARNING] id_file.csv is empty for experiment {experiment_id}")
             return
 
         required_id_columns = {"Stock", "stb.low", "stb.hi"}
@@ -664,7 +656,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
 
         if missing_id_columns:
             print(
-                f"⚠️ id_file.csv missing required columns: {', '.join(sorted(missing_id_columns))}. "
+                f"[WARNING] id_file.csv missing required columns: {', '.join(sorted(missing_id_columns))}. "
                 f"Found columns: {list(fieldnames)}"
             )
             return
@@ -681,7 +673,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
                 updated_count += 1
             else:
                 missing_stock_count += 1
-                print(f"⚠️ Stock not found in historical output, stb.low/stb.hi unchanged: {stock}")
+                print(f"[WARNING] Stock not found in historical output, stb.low/stb.hi unchanged: {stock}")
 
         # === WRITE BACK THE UPDATED WORKING id_file.csv ===
         with open(id_file_path, mode='w', newline='', encoding='utf-8-sig') as csvfile:
@@ -690,7 +682,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
             writer.writerows(id_rows)
 
         print(
-            f"✅ Updated stb.low/stb.hi in id_file.csv from historical output for {updated_count} stocks. "
+            f"[OK] Updated stb.low/stb.hi in id_file.csv from historical output for {updated_count} stocks. "
             f"Unmatched stocks: {missing_stock_count}"
         )
 
@@ -707,11 +699,11 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
         comparison_path = experiment_dir / "catch_comparison_detailed.csv"
 
         if not simulated_path.exists():
-            print(f"⚠️ Simulated catch file not found: {simulated_path}")
+            print(f"[WARNING] Simulated catch file not found: {simulated_path}")
             return
 
         if not original_path.exists():
-            print(f"⚠️ Original catch file not found: {original_path}")
+            print(f"[WARNING] Original catch file not found: {original_path}")
             return
 
         try:
@@ -721,15 +713,15 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
             with open(original_path, newline='', encoding='utf-8-sig') as csvfile:
                 original_rows = list(csv.DictReader(csvfile))
         except Exception as e:
-            print(f"❌ Failed to read catch files for comparison: {e}")
+            print(f"[ERROR] Failed to read catch files for comparison: {e}")
             return
 
         if not simulated_rows:
-            print(f"⚠️ Simulated catch file is empty: {simulated_path}")
+            print(f"[WARNING] Simulated catch file is empty: {simulated_path}")
             return
 
         if not original_rows:
-            print(f"⚠️ Original catch file is empty: {original_path}")
+            print(f"[WARNING] Original catch file is empty: {original_path}")
             return
 
         def parse_float_or_none(value):
@@ -795,7 +787,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
         all_stocks = sorted(set(sim_by_stock.keys()) & set(real_by_stock.keys()))
 
         if not all_stocks:
-            print(f"⚠️ No overlapping stocks found between simulated and original catch files for experiment {experiment_id}")
+            print(f"[WARNING] No overlapping stocks found between simulated and original catch files for experiment {experiment_id}")
             return
 
         comparison_rows = []
@@ -811,7 +803,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
             overlap_end = min(max(sim_years), max(real_years))
 
             if overlap_start > overlap_end:
-                print(f"⚠️ No overlapping years for stock {stock}")
+                print(f"[WARNING] No overlapping years for stock {stock}")
                 continue
 
             matched_years = 0
@@ -865,10 +857,10 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
 
                 matched_years += 1
 
-            print(f"✅ Comparison rows created for stock {stock}: {matched_years} matched years ({overlap_start}-{overlap_end})")
+            print(f"[OK] Comparison rows created for stock {stock}: {matched_years} matched years ({overlap_start}-{overlap_end})")
 
         if not comparison_rows:
-            print(f"⚠️ No comparison rows created for experiment {experiment_id}")
+            print(f"[WARNING] No comparison rows created for experiment {experiment_id}")
             return
 
         comparison_rows.sort(key=lambda x: (x["Stock"], x["yr"]))
@@ -883,7 +875,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
             writer.writeheader()
             writer.writerows(comparison_rows)
 
-        print(f"✅ Detailed catch & biomass comparison written to {comparison_path}")
+        print(f"[OK] Detailed catch & biomass comparison written to {comparison_path}")
 
     # === HELPER METHOD ===
     # THIS RENAMES ONLY OUTPUT FILES, NOT CORE INPUT / CONFIG FILES
@@ -900,7 +892,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
         }
 
         if not experiment_dir.exists():
-            print(f"⚠️ Experiment directory not found: {experiment_dir}")
+            print(f"[WARNING] Experiment directory not found: {experiment_dir}")
             return
 
         renamed_count = 0
@@ -920,11 +912,11 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
             try:
                 file_path.rename(new_path)
                 renamed_count += 1
-                print(f"✅ Renamed: {file_path.name} -> {new_path.name}")
+                print(f"[OK] Renamed: {file_path.name} -> {new_path.name}")
             except Exception as e:
-                print(f"❌ Failed to rename {file_path.name}: {e}")
+                print(f"[ERROR] Failed to rename {file_path.name}: {e}")
 
-        print(f"✅ Historical renaming complete. Renamed {renamed_count} files.")
+        print(f"[OK] Historical renaming complete. Renamed {renamed_count} files.")
 
     # === NEW HELPER METHOD ===
     # THIS RENAMES THE ORIGINAL HISTORICAL catch_file.csv
@@ -934,18 +926,18 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
         historical_catch_file_path = experiment_dir / "catch_file_historical.csv"
 
         if not catch_file_path.exists():
-            print(f"⚠️ catch_file.csv not found for experiment {experiment_id}")
+            print(f"[WARNING] catch_file.csv not found for experiment {experiment_id}")
             return
 
         if historical_catch_file_path.exists():
-            print(f"⚠️ catch_file_historical.csv already exists for experiment {experiment_id}. Skipping rename.")
+            print(f"[WARNING] catch_file_historical.csv already exists for experiment {experiment_id}. Skipping rename.")
             return
 
         try:
             catch_file_path.rename(historical_catch_file_path)
-            print(f"✅ Renamed catch_file.csv -> catch_file_historical.csv for experiment {experiment_id}")
+            print(f"[OK] Renamed catch_file.csv -> catch_file_historical.csv for experiment {experiment_id}")
         except Exception as e:
-            print(f"❌ Failed to rename catch_file.csv to catch_file_historical.csv: {e}")
+            print(f"[ERROR] Failed to rename catch_file.csv to catch_file_historical.csv: {e}")
 
     # === NEW HELPER METHOD ===
     # THIS KEEPS A HISTORICAL COPY OF THE FILTERED id_file.csv
@@ -956,18 +948,18 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
         historical_id_file_path = experiment_dir / "id_file_historical.csv"
 
         if not id_file_path.exists():
-            print(f"⚠️ id_file.csv not found for experiment {experiment_id}")
+            print(f"[WARNING] id_file.csv not found for experiment {experiment_id}")
             return
 
         if historical_id_file_path.exists():
-            print(f"⚠️ id_file_historical.csv already exists for experiment {experiment_id}. Skipping copy.")
+            print(f"[WARNING] id_file_historical.csv already exists for experiment {experiment_id}. Skipping copy.")
             return
 
         try:
             shutil.copy(id_file_path, historical_id_file_path)
-            print(f"✅ Created historical copy: id_file.csv -> id_file_historical.csv for experiment {experiment_id}")
+            print(f"[OK] Created historical copy: id_file.csv -> id_file_historical.csv for experiment {experiment_id}")
         except Exception as e:
-            print(f"❌ Failed to create id_file_historical.csv for experiment {experiment_id}: {e}")
+            print(f"[ERROR] Failed to create id_file_historical.csv for experiment {experiment_id}: {e}")
 
     # === NEW HELPER METHOD ===
     # THIS CREATES A NEW EMPTY catch_file.csv FOR SIMULATED DATA ONLY
@@ -981,7 +973,7 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
             with open(catch_file_path, mode='w', newline='') as csvfile:
                 writer = csv.writer(csvfile)
                 writer.writerow(["Stock", "yr", "ct", "bt"])
-            print(f"✅ Created new empty catch_file.csv for simulated data: {catch_file_path}")
+            print(f"[OK] Created new empty catch_file.csv for simulated data: {catch_file_path}")
         except Exception as e:
-            print(f"❌ Failed to create new empty catch_file.csv for simulated data: {e}")
+            print(f"[ERROR] Failed to create new empty catch_file.csv for simulated data: {e}")
 

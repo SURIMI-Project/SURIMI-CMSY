@@ -1,7 +1,6 @@
 import os
 import grpc
 
-from otlp_tracing import configure_oltp_grpc_tracing
 from concurrent import futures
 from server.exception_metadata_interceptor import ExceptionMetadataInterceptor
 from server.version_metadata_interceptor import VersionMetadataInterceptor
@@ -11,7 +10,8 @@ from vault_service import VaultService
 from dotenv import load_dotenv
 from importlib.metadata import version, PackageNotFoundError
 
-def serve():
+def _build_server():
+    """Initialise and start the gRPC server, return the server instance."""
     load_dotenv()  # Load environment variables from .env file
 
     # Experiment storage shared across services
@@ -27,12 +27,8 @@ def serve():
         print(f"{key}: {value}")
     print("=" * 80)
 
-    version = load_version("surimi_surimi_protocol_grpc_python")
-    print("Starting gRPC Server... with protocol version:", version)
-
-    otel_exporter_otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
-    print(f"OpenTelemetry tracing configured. Sending to: {otel_exporter_otlp_endpoint}")
-    tracer = configure_oltp_grpc_tracing( endpoint=otel_exporter_otlp_endpoint)  # Configure OpenTelemetry tracing
+    ver = load_version("surimi_surimi_protocol_grpc_python")
+    print("Starting gRPC Server... with protocol version:", ver)
 
     print("Starting gRPC Server...")
 
@@ -40,26 +36,42 @@ def serve():
     max_message_length = 100 * 1024 * 1024  # 100MB
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=10),
-        interceptors=[ExceptionMetadataInterceptor(), VersionMetadataInterceptor(version)],
+        interceptors=[ExceptionMetadataInterceptor(), VersionMetadataInterceptor(ver)],
         options=[
             ('grpc.max_send_message_length', max_message_length),
             ('grpc.max_receive_message_length', max_message_length),
         ]
     )
-    
-    stock_assessment_service = StockAssessmentService(tracer, experiment_dictionary, version)  # Instantiate the stock assessment service
+
+    stock_assessment_service = StockAssessmentService(experiment_dictionary, ver)
     stock_assesment_service_pb2_grpc.add_StockAssesmentServiceServicer_to_server(stock_assessment_service, server)
 
     # Bind the server to a port
     server.add_insecure_port("[::]:5021")
     server.start()
     print("[OK] gRPC Server running on port 5021")
+    return server
 
-    # Wait for the server to stop
+
+def serve():
+    """Blocking entry point used when running server/app.py directly."""
+    server = _build_server()
     try:
         server.wait_for_termination()
     except KeyboardInterrupt:
         print("\n[INFO] Server shutting down...")
+
+
+def serve_in_thread():
+    """Non-blocking entry point for in-process use (e.g. integration tests).
+
+    Starts the gRPC server and returns immediately so the calling thread
+    (typically a daemon thread) can keep the server alive.
+    """
+    server = _build_server()  # Keep reference alive to prevent GC from stopping the server
+    import time
+    while True:
+        time.sleep(3600)
 
 def load_version(package_name: str) -> str:
     try:

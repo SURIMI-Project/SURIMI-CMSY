@@ -32,7 +32,7 @@ class R_ScriptRunner:
         print(result.stderr)
 
         if result.returncode == 0:
-            print("✅ CMSY++ completed.")
+            print("[OK] CMSY++ completed.")
             S3_Storage.UploadFilesToS3(os.path.dirname(script), f"surimi-cmsy/Experiments/{experiment_id}")
         else:
-            print(f"❌ CMSY++ failed with exit code {result.returncode}.")
+            print(f"[ERROR] CMSY++ failed with exit code {result.returncode}.")

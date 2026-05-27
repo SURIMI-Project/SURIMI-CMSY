@@ -31,4 +31,4 @@ def get_common_name(alpha_code: str) -> str:
 if __name__ == "__main__":
     test_codes = ["PIL", "XYZ", "BBK", "sal", " abc "]
     for code in test_codes:
-        print(f"{code} → {get_common_name(code)}")
+        print(f"{code} -> {get_common_name(code)}")
