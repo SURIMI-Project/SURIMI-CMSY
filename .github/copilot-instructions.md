@@ -14,14 +14,14 @@
 - There is no checked-in unit test or lint configuration. The only repo-defined targeted smoke checks are the helper modules with `__main__` blocks:
   - `.\.venv\Scripts\python.exe server\species_lookup.py`
   - `.\.venv\Scripts\python.exe server\division_lookup.py`
-- Integration tests live in `integration_tests\`. They start the CMSY service as a subprocess and send real gRPC messages to it. Run them from the repo root with:
-  - `.\.venv\Scripts\python.exe -m pytest integration_tests\tests\ -v`
-  - The JSON request fixtures are in `integration_tests\GrpcMessages\<MessageName>\request.json`
+- Integration tests live in `integration_tests\`. They start the CMSY service **in-process** (via `serve_in_thread`) and send real gRPC messages to it. Run them from the repo root with:
+  - `.\venv\Scripts\python.exe -m pytest integration_tests\tests\ -v`
+  - The JSON request fixtures are in `integration_tests\GrpcMessages\<MessageName>\StockAssesmentService_<MessageName>.json`
 
 ## High-level architecture
 
 - This repository is a Python gRPC wrapper around the CMSY++ R model. The gRPC protocol is **not** stored in this repo; `server\app.py` imports generated stubs from the installed `surimi-surimi-protocol-grpc-python` package, which is version-pinned in `requirements.txt` and documented in `README.md`.
-- `server\app.py` is the runtime entrypoint. It loads `.env`, optionally hydrates additional secrets from Vault, configures OpenTelemetry gRPC tracing, installs two interceptors, and hosts `StockAssessmentService` on port `5021`.
+- `server\app.py` is the runtime entrypoint. It loads `.env`, optionally hydrates additional secrets from Vault, installs two interceptors, and hosts `StockAssessmentService` on port `5021`. It also exposes `serve_in_thread()` for in-process use by the integration test suite.
 - `server\StockAssesment.py` is the core orchestration layer. It manages experiment lifecycle and bridges protobuf requests to filesystem, CSV, S3, and R-script operations:
   - `InitialiseExperiment` creates `experiments\<experiment_id>`, refreshes base files from `surimi-cmsy/config` in S3 into `R_files`, copies the working CMSY inputs, filters them down to the contract species from the init request, runs an initial historical assessment, then converts the experiment into the phase-2 simulated state.
   - `UpdateBiomassStatistics` and `UpdateCatchDispositionStatistics` accumulate monthly grid statistics in the in-memory `Simulation` object.
@@ -45,7 +45,7 @@
   - yearly simulated catch rows are written as `"<common species name> - <FAO division>"`
   Do not collapse these formats unless the whole pipeline is updated together.
 - `server\species_lookup.py` and `server\division_lookup.py` load their lookup datasets once at module import from `R_files\`. Changes to those file locations or schemas ripple into runtime behavior immediately.
-- `server\app.py` currently mixes package imports (`from server...`) with sibling imports (`from otlp_tracing import ...`, `from vault_service import ...`). Follow the existing entrypoint pattern (`python server\app.py` and the Docker `CMD`) unless you are deliberately normalizing imports across the whole service.
+- `server\app.py` currently mixes package imports (`from server...`) with a sibling import (`from vault_service import ...`). Follow the existing entrypoint pattern (`python server\app.py` and the Docker `CMD`) unless you are deliberately normalizing imports across the whole service.
 
 ## Related repositories
 

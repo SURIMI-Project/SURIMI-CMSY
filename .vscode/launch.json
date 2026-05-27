@@ -14,6 +14,15 @@
             "cwd": "${workspaceFolder}",
             "env": {},
             "stopOnEntry": false
+        },
+        {
+            "name": "Pytest: integration tests (use running service)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["integration_tests/tests", "-v", "-s"],
+            "cwd": "${workspaceFolder}",
+            "justMyCode": false
         }
     ]
 }

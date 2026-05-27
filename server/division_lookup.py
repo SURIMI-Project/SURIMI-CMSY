@@ -24,7 +24,7 @@ def get_division(latitude: float, longitude: float) -> str:
         return "Unknown Division"
 
     try:
-        point = Point(longitude, latitude)  # ⚠️ Note: (lon, lat) order
+        point = Point(longitude, latitude)  # [WARNING] Note: (lon, lat) order
         match = fao_gdf[fao_gdf.geometry.contains(point)]
 
         if not match.empty:
@@ -45,4 +45,4 @@ if __name__ == "__main__":
     print("[TEST] Running FAO division lookup test...\n")
     for lat, lon in test_points:
         result = get_division(lat, lon)
-        print(f"Coordinates ({lat}, {lon}) → Division: {result}")
+        print(f"Coordinates ({lat}, {lon}) -> Division: {result}")

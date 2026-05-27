@@ -5,10 +5,14 @@ from integration_tests.helpers.grpc_client import CmsyGrpcClient
 
 @pytest.fixture(scope="session")
 def cmsy_service():
-    """Start the CMSY service once for the entire test session."""
-    process = start_service()
-    yield process
-    stop_service(process)
+    """Start the CMSY gRPC server in a background thread within the pytest process.
+
+    Because the server runs in the same process, VS Code breakpoints in
+    StockAssesment.py are hit automatically when using 'Debug Tests'.
+    """
+    thread = start_service()
+    yield thread
+    stop_service(thread)
 
 
 @pytest.fixture(scope="session")
