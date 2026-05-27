@@ -420,7 +420,7 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
                 if cell_key not in sim.aggregated_biomass[grid.species.species_code]:
                     sim.aggregated_biomass[grid.species.species_code][cell_key] = 0.0
                 # Add the biomass of the cell to the aggregated_biomass for the species  
-                sim.aggregated_biomass[grid.species.species_code][cell_key] += cell.biomass
+                sim.aggregated_biomass[grid.species.species_code][cell_key] += cell.biomass.mean
 
         return update_biomass_statistics_pb2.UpdateBiomassStatisticsResponse(
             experiment_id=request.experiment_id
