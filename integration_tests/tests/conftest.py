@@ -8,7 +8,7 @@ def cmsy_service():
     """Start the CMSY gRPC server in a background thread within the pytest process.
 
     Because the server runs in the same process, VS Code breakpoints in
-    StockAssesment.py are hit automatically when using 'Debug Tests'.
+    StockAssessment.py are hit automatically when using 'Debug Tests'.
     """
     thread = start_service()
     yield thread

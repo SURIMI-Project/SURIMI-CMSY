@@ -7,7 +7,7 @@ def test_cancel_experiment_succeeds(grpc_client):
     """Initialise a dedicated experiment then cancel it."""
 
     # Initialise a dedicated experiment for the cancel test using the standard fixture
-    init_message = load_message("InitialiseExperiment", "StockAssesmentService_InitialiseExperiment.json")
+    init_message = load_message("InitialiseExperiment", "StockAssessmentService_InitialiseExperiment.json")
     grpc_client.initialise_experiment(init_message)
 
     cancel_message = {"experiment_id": init_message["experiment_id"]}

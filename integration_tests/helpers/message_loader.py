@@ -8,7 +8,7 @@ def load_message(message_name: str, filename: str) -> dict:
     """Load a JSON message from GrpcMessages/<message_name>/<filename>.
 
     Following the naming convention used in the SURIMI-protocol repo,
-    e.g. load_message("InitialiseExperiment", "StockAssesmentService_InitialiseExperiment.json")
+    e.g. load_message("InitialiseExperiment", "StockAssessmentService_InitialiseExperiment.json")
     """
     path = GRPC_MESSAGES_DIR / message_name / filename
     if not path.exists():

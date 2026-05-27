@@ -1,11 +1,12 @@
 import grpc
 from google.protobuf import json_format
 from surimi.v1 import (
-    stock_assesment_service_pb2_grpc,
+    stock_assessment_service_pb2_grpc,
     cancel_experiment_pb2,
     experiment_step_pb2,
     finalise_experiment_pb2,
     get_protocol_version_pb2,
+    get_stock_assessment_pb2,
     initialise_experiment_pb2,
     update_biomass_statistics_pb2,
     update_catch_disposition_statistics_pb2,
@@ -17,7 +18,7 @@ SERVICE_ADDRESS = "localhost:5021"
 class CmsyGrpcClient:
     def __init__(self, address: str = SERVICE_ADDRESS):
         self.channel = grpc.insecure_channel(address)
-        self.stub = stock_assesment_service_pb2_grpc.StockAssesmentServiceStub(self.channel)
+        self.stub = stock_assessment_service_pb2_grpc.StockAssessmentServiceStub(self.channel)
 
     def close(self):
         self.channel.close()
@@ -64,3 +65,9 @@ class CmsyGrpcClient:
             message_dict, cancel_experiment_pb2.CancelExperimentRequest()
         )
         return self.stub.CancelExperiment(request)
+
+    def get_stock_assessment(self, message_dict: dict):
+        request = json_format.ParseDict(
+            message_dict, get_stock_assessment_pb2.GetStockAssessmentRequest()
+        )
+        return self.stub.GetStockAssessment(request)

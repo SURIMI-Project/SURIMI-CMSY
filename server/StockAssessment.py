@@ -2,7 +2,7 @@ from dateutil.relativedelta import relativedelta
 import grpc
 from server.s3_storage import S3_Storage
 from server.Simulation import Simulation
-from surimi.v1 import stock_assesment_service_pb2_grpc, initialise_experiment_pb2, finalise_experiment_pb2, experiment_step_pb2, finalise_experiment_pb2, cancel_experiment_pb2, update_biomass_statistics_pb2, update_catch_disposition_statistics_pb2, get_protocol_version_pb2
+from surimi.v1 import stock_assessment_service_pb2_grpc, get_stock_assessment_pb2, stock_assessment_pb2, species_pb2, initialise_experiment_pb2, finalise_experiment_pb2, experiment_step_pb2, finalise_experiment_pb2, cancel_experiment_pb2, update_biomass_statistics_pb2, update_catch_disposition_statistics_pb2, get_protocol_version_pb2
 from pathlib import Path
 import shutil
 from server.division_lookup import get_division
@@ -11,7 +11,7 @@ from server.species_lookup import get_common_name
 from server.common_functions import log_and_abort
 from server.r_scriptrunner import R_ScriptRunner
 
-class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServiceServicer):
+class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentServiceServicer):
     def __init__(self, experiment_dictionary: dict[str, Simulation], version: str):
         self.experiment_dictionary = experiment_dictionary  # Will hold the current simulation instance
         self.version = version  # Store the version
@@ -461,6 +461,45 @@ class StockAssessmentService(stock_assesment_service_pb2_grpc.StockAssesmentServ
     def GetProtocolVersion(self, request: get_protocol_version_pb2.GetProtocolVersionRequest, context: grpc.ServicerContext):
         return get_protocol_version_pb2.GetProtocolVersionResponse(
             protocol_version=self.version
+        )
+
+    def GetStockAssessment(self, request: get_stock_assessment_pb2.GetStockAssessmentRequest, context: grpc.ServicerContext):
+        if request.experiment_id not in self.experiment_dictionary:
+            log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} not known.")
+
+        print(f"GetStockAssessment for experiment {request.experiment_id}")
+
+        # TODO: read the output csv file (West_Med_id_file_output.csv) and build a real response
+        # Hardcoded dummy response for PIL, ANK, BOG
+        summary = stock_assessment_pb2.StockAssessmentSummary(
+            species_stock_assessments=[
+                stock_assessment_pb2.SpeciesStockAssessment(
+                    species=species_pb2.Species(species_code="PIL"),
+                    stock_assessments=[
+                        stock_assessment_pb2.StockAssessment(year=2013, exploitation=0.5, stock_status=0.8),
+                        stock_assessment_pb2.StockAssessment(year=2014, exploitation=0.6, stock_status=0.7)
+                    ]
+                ),
+                stock_assessment_pb2.SpeciesStockAssessment(
+                    species=species_pb2.Species(species_code="ANK"),
+                    stock_assessments=[
+                        stock_assessment_pb2.StockAssessment(year=2013, exploitation=0.4, stock_status=0.75),
+                        stock_assessment_pb2.StockAssessment(year=2014, exploitation=0.45, stock_status=0.72)
+                    ]
+                ),
+                stock_assessment_pb2.SpeciesStockAssessment(
+                    species=species_pb2.Species(species_code="BOG"),
+                    stock_assessments=[
+                        stock_assessment_pb2.StockAssessment(year=2013, exploitation=0.6, stock_status=0.65),
+                        stock_assessment_pb2.StockAssessment(year=2014, exploitation=0.65, stock_status=0.6)
+                    ]
+                ),
+            ]
+        )
+
+        return get_stock_assessment_pb2.GetStockAssessmentResponse(
+            experiment_id=request.experiment_id,
+            stock_assessment_summary=summary
         )
 
     def _update_id_file(self, experiment_id: str, stocks: list[str], year: int):
