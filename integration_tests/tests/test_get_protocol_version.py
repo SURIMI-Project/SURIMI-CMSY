@@ -2,7 +2,7 @@ from integration_tests.helpers.message_loader import load_message
 
 
 def test_get_protocol_version(grpc_client):
-    message = load_message("GetProtocolVersion", "StockAssesmentService_GetProtocolVersion.json")
+    message = load_message("GetProtocolVersion", "StockAssessmentService_GetProtocolVersion.json")
     response = grpc_client.get_protocol_version(message)
     assert response is not None
     assert response.protocol_version != ""

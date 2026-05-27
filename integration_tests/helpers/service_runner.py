@@ -34,7 +34,7 @@ def start_service() -> threading.Thread:
     """Start the gRPC server in a background daemon thread.
 
     Because the server runs in the same process as pytest, the VS Code
-    debugger will hit breakpoints in StockAssesment.py automatically.
+    debugger will hit breakpoints in StockAssessment.py automatically.
     No CMSY_EXTERNAL_SERVICE env var needed.
     """
     from server.app import serve_in_thread

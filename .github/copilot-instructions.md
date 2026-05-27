@@ -16,13 +16,13 @@
   - `.\.venv\Scripts\python.exe server\division_lookup.py`
 - Integration tests live in `integration_tests\`. They start the CMSY service **in-process** (via `serve_in_thread`) and send real gRPC messages to it. Run them from the repo root with:
   - `.\venv\Scripts\python.exe -m pytest integration_tests\tests\ -v`
-  - The JSON request fixtures are in `integration_tests\GrpcMessages\<MessageName>\StockAssesmentService_<MessageName>.json`
+  - The JSON request fixtures are in `integration_tests\GrpcMessages\<MessageName>\StockAssessmentService_<MessageName>.json`
 
 ## High-level architecture
 
 - This repository is a Python gRPC wrapper around the CMSY++ R model. The gRPC protocol is **not** stored in this repo; `server\app.py` imports generated stubs from the installed `surimi-surimi-protocol-grpc-python` package, which is version-pinned in `requirements.txt` and documented in `README.md`.
 - `server\app.py` is the runtime entrypoint. It loads `.env`, optionally hydrates additional secrets from Vault, installs two interceptors, and hosts `StockAssessmentService` on port `5021`. It also exposes `serve_in_thread()` for in-process use by the integration test suite.
-- `server\StockAssesment.py` is the core orchestration layer. It manages experiment lifecycle and bridges protobuf requests to filesystem, CSV, S3, and R-script operations:
+- `server\StockAssessment.py` is the core orchestration layer. It manages experiment lifecycle and bridges protobuf requests to filesystem, CSV, S3, and R-script operations:
   - `InitialiseExperiment` creates `experiments\<experiment_id>`, refreshes base files from `surimi-cmsy/config` in S3 into `R_files`, copies the working CMSY inputs, filters them down to the contract species from the init request, runs an initial historical assessment, then converts the experiment into the phase-2 simulated state.
   - `UpdateBiomassStatistics` and `UpdateCatchDispositionStatistics` accumulate monthly grid statistics in the in-memory `Simulation` object.
   - `ExperimentStep` advances time one month at a time; when a year boundary is crossed it writes that year’s aggregated rows into `catch_file.csv`, using FAO division lookup plus common-name lookup to build stock labels.

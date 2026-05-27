@@ -31,8 +31,6 @@ class R_ScriptRunner:
         print("Rscript stderr:")
         print(result.stderr)
 
-        if result.returncode == 0:
-            print("[OK] CMSY++ completed.")
-            S3_Storage.UploadFilesToS3(os.path.dirname(script), f"surimi-cmsy/Experiments/{experiment_id}")
-        else:
-            print(f"[ERROR] CMSY++ failed with exit code {result.returncode}.")
+        print("[OK] CMSY++ completed.")
+        if result.returncode != 0:
+            raise RuntimeError(f"R script {script} failed with return code {result.returncode}")
