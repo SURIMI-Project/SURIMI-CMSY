@@ -168,18 +168,6 @@
             ],
             "species": [
                 {
-                    "species_code": "ALB",
-                    "length_class": "",
-                    "age": "",
-                    "life_stage": ""
-                },
-                {
-                    "species_code": "ANK",
-                    "length_class": "",
-                    "age": "",
-                    "life_stage": ""
-                },
-                {
                     "species_code": "BOG",
                     "length_class": "",
                     "age": "",
