@@ -264,7 +264,7 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
 
             catch_file_path = Path(__file__).parent.parent.resolve() / "experiments" / request.experiment_id / "catch_file.csv"
 
-            if not sim.aggregated_catch_dictionary:
+            if not sim.aggregated_data:
                 print("[WARNING] No aggregated catch data found. Writing NA entries to catch_file.csv")
                 id_file_path = Path(__file__).parent.parent / "experiments" / request.experiment_id / "id_file.csv"
                 try:
@@ -301,19 +301,12 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
                     experiment_id=request.experiment_id
                 )
 
-            catch_file = {}
-            for species_code, cell_catches in sim.aggregated_catch_dictionary.items():
-                for cell_key, catch_value in cell_catches.items():
-                    division = get_division(cell_key[0], cell_key[1])
-                    common_name = get_common_name(species_code)
-
-                    if common_name not in catch_file:
-                        catch_file[common_name] = {}
-
-                    if division not in catch_file[common_name]:
-                        catch_file[common_name][division] = 0.0
-
-                    catch_file[common_name][division] += catch_value
+            species_totals = {}
+            for species_code, cell_data in sim.aggregated_data.items():
+                total_catch = sum(v["catch"] for v in cell_data.values())
+                biomass_values = [v["biomass"] for v in cell_data.values() if v["biomass"] > 0]
+                mean_biomass = round(sum(biomass_values) / len(biomass_values), 2) if biomass_values else None
+                species_totals[species_code] = {"catch": total_catch, "biomass": mean_biomass}
 
             import csv
             sim.last_written_stock_names = []
@@ -321,18 +314,16 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
 
             with open(catch_file_path, mode='a', newline='') as csvfile:
                 writer = csv.writer(csvfile)
-                for common_name, divisions in catch_file.items():
-                    for division, catch_value in divisions.items():
-                        stock_label = f"{common_name} - {division}"
-                        row = [stock_label, current_year, round(catch_value, 2), "NA"]
-                        writer.writerow(row)
-                        sim.last_written_stock_names.append(stock_label)
+                for species_code, totals in species_totals.items():
+                    catch_value = totals["catch"]
+                    bt_value = totals["biomass"] if totals["biomass"] is not None else "NA"
+                    writer.writerow([species_code, current_year, round(catch_value, 2), bt_value])
+                    sim.last_written_stock_names.append(species_code)
 
-                        if catch_value > 0:
-                            print(f"[OK] {stock_label}: {round(catch_value, 2)} kg in {current_year}")
+                    if catch_value > 0:
+                        print(f"[OK] {species_code}: {round(catch_value, 2)} kg catch, {bt_value} mean biomass in {current_year}")
 
-            sim.aggregated_catch_dictionary.clear()
-            sim.aggregated_biomass.clear()
+            sim.aggregated_data.clear()
 
             id_file_path = Path(__file__).parent.parent / "experiments" / request.experiment_id / "id_file.csv"
             try:
@@ -409,18 +400,16 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
 
         # Loop over every grid in biomass_grids
         for grid in request.biomass_statistics_summary.biomass_grids_statistics:
-            # Check if the species is already in the aggregated_biomass
-            if grid.species.species_code not in sim.aggregated_biomass:
-                sim.aggregated_biomass[grid.species.species_code] = {}
+            species_code = grid.species.species_code
+            if species_code not in sim.aggregated_data:
+                sim.aggregated_data[species_code] = {}
 
             # Loop over every cell in the grid
             for cell in grid.biomass_cells_statistics:
                 cell_key = (cell.latitude, cell.longitude)
-                # Check if the cell is already in the aggregated_biomass for the species   
-                if cell_key not in sim.aggregated_biomass[grid.species.species_code]:
-                    sim.aggregated_biomass[grid.species.species_code][cell_key] = 0.0
-                # Add the biomass of the cell to the aggregated_biomass for the species  
-                sim.aggregated_biomass[grid.species.species_code][cell_key] += cell.biomass.mean
+                if cell_key not in sim.aggregated_data[species_code]:
+                    sim.aggregated_data[species_code][cell_key] = {"catch": 0.0, "biomass": 0.0}
+                sim.aggregated_data[species_code][cell_key]["biomass"] += cell.biomass.mean
 
         return update_biomass_statistics_pb2.UpdateBiomassStatisticsResponse(
             experiment_id=request.experiment_id
@@ -440,19 +429,16 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
 
         # Loop over every grid in Disposition_grids
         for grid in request.catch_disposition_statistics_summary.disposition_grids_statistics:
-            # Check if the species is already in the aggregated_catch_dictionary
-            if grid.species.species_code not in sim.aggregated_catch_dictionary:
-                sim.aggregated_catch_dictionary[grid.species.species_code] = {}
+            species_code = grid.species.species_code
+            if species_code not in sim.aggregated_data:
+                sim.aggregated_data[species_code] = {}
 
             # Loop over every cell in the grid
             for cell in grid.disposition_cells_statistics:
                 cell_key = (cell.latitude, cell.longitude)
-                # Check if the cell is already in the aggregated_catch_dictionary for the species   
-                if cell_key not in sim.aggregated_catch_dictionary[grid.species.species_code]:
-                    sim.aggregated_catch_dictionary[grid.species.species_code][cell_key] = 0.0
-                
-                # Add the catch of the cell to the aggregated_catch_dictionary for the species  
-                sim.aggregated_catch_dictionary[grid.species.species_code][cell_key] += cell.gross_catch.mean                    
+                if cell_key not in sim.aggregated_data[species_code]:
+                    sim.aggregated_data[species_code][cell_key] = {"catch": 0.0, "biomass": 0.0}
+                sim.aggregated_data[species_code][cell_key]["catch"] += cell.gross_catch.mean                    
 
         return update_catch_disposition_statistics_pb2.UpdateCatchDispositionStatisticsResponse(
             experiment_id=request.experiment_id

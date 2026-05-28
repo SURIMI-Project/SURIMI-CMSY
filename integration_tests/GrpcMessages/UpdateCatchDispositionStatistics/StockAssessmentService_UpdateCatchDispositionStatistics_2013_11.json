@@ -1,0 +1,80 @@
+{
+    "experiment_id": "3CD4786B-AABA-482E-9A2D-CAC4B2F6BAD6",
+    "catch_disposition_statistics_summary": {
+        "disposition_grids_statistics": [
+            {
+                "disposition_cells_statistics": [
+                    {
+                        "longitude": 2.5,
+                        "latitude": 41.0,
+                        "gross_catch": {
+                            "mean": 150.0,
+                            "p05": 120.0,
+                            "p95": 180.0
+                        },
+                        "live_discards": {
+                            "mean": 5.0,
+                            "p05": 2.0,
+                            "p95": 8.0
+                        },
+                        "dead_discards": {
+                            "mean": 1.0,
+                            "p05": 0.5,
+                            "p95": 2.0
+                        }
+                    }
+                ],
+                "species": {
+                    "species_code": "BOG",
+                    "length_class": "",
+                    "age": "",
+                    "life_stage": ""
+                },
+                "fleet_segment": {
+                    "gear_code": "PS",
+                    "vessel_length_class": "",
+                    "scale": "",
+                    "country_code": "ESP",
+                    "model": ""
+                }
+            },
+            {
+                "disposition_cells_statistics": [
+                    {
+                        "longitude": 2.5,
+                        "latitude": 41.0,
+                        "gross_catch": {
+                            "mean": 500.0,
+                            "p05": 400.0,
+                            "p95": 600.0
+                        },
+                        "live_discards": {
+                            "mean": 20.0,
+                            "p05": 10.0,
+                            "p95": 30.0
+                        },
+                        "dead_discards": {
+                            "mean": 5.0,
+                            "p05": 2.0,
+                            "p95": 8.0
+                        }
+                    }
+                ],
+                "species": {
+                    "species_code": "PIL",
+                    "length_class": "",
+                    "age": "",
+                    "life_stage": ""
+                },
+                "fleet_segment": {
+                    "gear_code": "PS",
+                    "vessel_length_class": "",
+                    "scale": "",
+                    "country_code": "ESP",
+                    "model": ""
+                }
+            }
+        ]
+    }
+}
+    

@@ -1,6 +1,6 @@
 {
     "experiment_id": "3CD4786B-AABA-482E-9A2D-CAC4B2F6BAD6",
-    "date_time": "2013-01-01T00:00:00.000Z",
+    "date_time": "2013-11-01T00:00:00.000Z",
     "biomass_statistics_summary": {
         "biomass_grids_statistics": [
             {
@@ -15,8 +15,7 @@
                             "mean": 1000.0,
                             "p05": 2.0,
                             "p95": 8.0
-                        }
-                    }
+                        }                    }
                 ]
             },
             {
