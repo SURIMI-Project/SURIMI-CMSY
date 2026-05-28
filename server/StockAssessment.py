@@ -254,7 +254,7 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
         if sim.step_size != "P1M":
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Error in experiment {request.experiment_id}: Only monthly steps are supported. Please set the step size to P1M.")
 
-        print(f"SimulateStep for experiment {request.experiment_id} and date {sim.current_date_time}")
+        print(f"SimulateStep for experiment {request.experiment_id} of date {request.current_date_time.ToDatetime().strftime('%Y-%m-%d')}")
 
         current_year = sim.current_date_time.year
         sim.current_date_time += relativedelta(months=1)
@@ -393,7 +393,7 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
         if request.experiment_id not in self.experiment_dictionary:
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} not known.")
 
-        print(f"Update biomass for experiment {request.experiment_id}")
+        print(f"Update biomass for experiment {request.experiment_id} of date {request.date_time.ToDatetime().strftime('%Y-%m-%d')}")
         # print(request)  # for debugging purposes
 
         sim = self.experiment_dictionary[request.experiment_id]
@@ -419,7 +419,7 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
         if not request.experiment_id in self.experiment_dictionary.keys():
             log_and_abort(context, grpc.StatusCode.INVALID_ARGUMENT, f"Experiment Id {request.experiment_id} not known.")
 
-        print(f"Update CatchDisposition for experiment {request.experiment_id} ")
+        print(f"Update CatchDisposition for experiment {request.experiment_id} of date {request.start_date_time.ToDatetime().strftime('%Y-%m-%d')}")
 # Aggregate the catch data
 # Check if the year is complete
 # if so, add the catch of the species to the csv file
