@@ -15,43 +15,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
     libblas-dev \
     liblapack-dev \
-    libfontconfig1-dev \
-    libfreetype6-dev \
-    libharfbuzz-dev \
-    libfribidi-dev \
-    libpng-dev \
-    libcairo2-dev \
-    libjpeg-dev \
-    libtiff5-dev \
-    libgif-dev \
     gfortran \
     libreadline-dev \
-    wget \
+    jags \
     locales \
     && echo "en_US.UTF-8 UTF-8" > /etc/locale.gen \
     && locale-gen \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-
-# Install JAGS 4.3.1 from source
-RUN wget https://sourceforge.net/projects/mcmc-jags/files/JAGS/4.x/Source/JAGS-4.3.1.tar.gz \
-    && tar -xvzf JAGS-4.3.1.tar.gz \
-    && cd JAGS-4.3.1 \
-    && ./configure \
-    && make \
-    && make install \
-    && cd .. \
-    && rm -rf JAGS-4.3.1 JAGS-4.3.1.tar.gz
-
-    
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    texlive-xetex \
-    texlive-fonts-recommended \
-    texlive-latex-extra \
-    fonts-dejavu \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
 
 # Set environment variables for R and JAGS
 ENV PATH="/usr/lib/R/bin:${PATH}"
@@ -59,7 +30,6 @@ ENV R_HOME=/usr/lib/R
 ENV RPY2_R_HOME=/usr/lib/R
 ENV R_LIBS_USER=/usr/local/lib/R/site-library
 ENV R_ENVIRON_USER=/usr/lib/R/etc/Renviron
-ENV LD_LIBRARY_PATH=/usr/local/lib
 
 # Install R packages that depend on JAGS
 RUN Rscript -e "install.packages(c('rjags', 'R2jags', 'stringr'), repos='https://cloud.r-project.org')"
