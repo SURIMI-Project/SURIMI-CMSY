@@ -29,6 +29,8 @@
   - `FinaliseExperiment` updates `id_file.csv` with the simulated year range, writes `catch_comparison_detailed.csv`, reruns the R assessment, and uploads outputs through `S3_Storage`.
 - `R_files\` contains the model inputs and lookup assets that the Python service expects to exist locally: `AA_CMSY++.R`, `ffnn.bin`, `catch_file.csv`, `catch_file_original.csv`, `id_file.csv`, the FAO shapefile, and the ASFIS common-name CSV.
 - `server\r_scriptrunner.py` changes the process working directory into `experiments\<experiment_id>` before calling `Rscript`. That is why the R script uses plain filenames like `catch_file.csv` and `id_file.csv` instead of absolute paths.
+- `AA_CMSY++.R` is configured for **CSV-only output**: `save.plots <- F`, `write.pdf <- F`, `mgraphs <- F`, `kobe.plot <- F`, `rk.diags <- F`. It produces no JPEG, PNG, or PDF files. This is why the Dockerfile contains no graphics libraries (libcairo, libjpeg, libpng, etc.) and no LaTeX/texlive packages.
+- **JAGS** is installed from the Debian Bookworm apt package (`jags`) — version 4.3.1 — rather than compiled from source. Do not add a from-source compilation block; update the apt package version instead if a newer JAGS is needed.
 
 ## Key repository-specific conventions
 

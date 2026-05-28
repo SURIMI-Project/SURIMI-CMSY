@@ -8,19 +8,15 @@ So there are no proto files in the project!
 
 The proto files are also stored in  https://buf.build/surimi/surimi-protocol
 
-## Watch out! Check that you are using the SDK version v1.70.1!!
-You have to use version "v1.10.1" of the grpc/python SDK.
-More recent versions give trouble with the protobuf version in combination with Open Telemetry. But only when you create a docker image from it.
-
 To use the interface in this Python project you have to use the generated proxy files. These files are imported as a "pip" package.
 
-When you want to install a new version of the gRPC interface you go to https://buf.build/surimi/surimi-protocol/sdks/main:grpc/python?version=v1.70.1
+When you want to install a new version of the gRPC interface you go to https://buf.build/surimi/surimi-protocol/sdks/main%3Agrpc/python?version=v1.80.0
 Copy the line, but without the "python3 -m " part and run in in a terminal.
 
 
 For example
 ```bash
-PS C:\Users\Rik\source\repos\SURIMI-CMSY> pip install surimi-surimi-protocol-grpc-python==1.70.1.1.20250626155734+d9c7c394022e --extra-index-url https://buf.build/gen/python
+PS C:\Users\Rik\source\repos\SURIMI-CMSY> pip install surimi-surimi-protocol-grpc-python==1.80.0.1.20260527152210+81d0f7607726 --extra-index-url https://buf.build/gen/python
 ```
 
 The layout of the version number is explained in https://buf.build/docs/bsr/generated-sdks/python/?h=python#full-syntax

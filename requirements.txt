@@ -1,7 +1,7 @@
 grpcio
 grpc-interceptor
 protobuf>=7.34.0
-surimi-surimi-protocol-grpc-python==1.70.1.1.20260527094208+cbc36417bd37 
+surimi-surimi-protocol-grpc-python==1.80.0.1.20260527152210+81d0f7607726 
 --extra-index-url https://buf.build/gen/python
 python-dateutil
 boto3
