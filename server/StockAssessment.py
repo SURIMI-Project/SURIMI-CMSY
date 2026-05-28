@@ -304,16 +304,9 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
             catch_file = {}
             for species_code, cell_catches in sim.aggregated_catch_dictionary.items():
                 for cell_key, catch_value in cell_catches.items():
-                    division = get_division(cell_key[0], cell_key[1])
-                    common_name = get_common_name(species_code)
-
-                    if common_name not in catch_file:
-                        catch_file[common_name] = {}
-
-                    if division not in catch_file[common_name]:
-                        catch_file[common_name][division] = 0.0
-
-                    catch_file[common_name][division] += catch_value
+                    if species_code not in catch_file:
+                        catch_file[species_code] = 0.0
+                    catch_file[species_code] += catch_value
 
             import csv
             sim.last_written_stock_names = []
@@ -321,15 +314,13 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
 
             with open(catch_file_path, mode='a', newline='') as csvfile:
                 writer = csv.writer(csvfile)
-                for common_name, divisions in catch_file.items():
-                    for division, catch_value in divisions.items():
-                        stock_label = f"{common_name} - {division}"
-                        row = [stock_label, current_year, round(catch_value, 2), "NA"]
-                        writer.writerow(row)
-                        sim.last_written_stock_names.append(stock_label)
+                for species_code, catch_value in catch_file.items():
+                    row = [species_code, current_year, round(catch_value, 2), "NA"]
+                    writer.writerow(row)
+                    sim.last_written_stock_names.append(species_code)
 
-                        if catch_value > 0:
-                            print(f"[OK] {stock_label}: {round(catch_value, 2)} kg in {current_year}")
+                    if catch_value > 0:
+                        print(f"[OK] {species_code}: {round(catch_value, 2)} kg in {current_year}")
 
             sim.aggregated_catch_dictionary.clear()
             sim.aggregated_biomass.clear()

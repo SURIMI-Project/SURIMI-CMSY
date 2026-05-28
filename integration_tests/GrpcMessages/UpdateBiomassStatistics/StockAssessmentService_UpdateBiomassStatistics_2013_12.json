@@ -1,0 +1,34 @@
+{
+    "experiment_id": "3CD4786B-AABA-482E-9A2D-CAC4B2F6BAD6",
+    "start_date_time": "2013-12-01T00:00:00.000Z",
+    "end_date_time": "2014-01-01T00:00:00.000Z",
+    "biomass_summary": {
+        "biomass_grids": [
+            {
+                "species": {
+                    "species_code": "PIL"
+                },
+                "biomass_cells": [
+                    {
+                        "longitude": 1.6877561,
+                        "latitude": 40.901618,
+                        "biomass": 1000.0
+                    }
+                ]
+            },
+            {
+                "species": {
+                    "species_code": "BOG"
+                },
+                "biomass_cells": [
+                    {
+                        "longitude": 1.6170411,
+                        "latitude": 40.801618,
+                        "biomass": 2500.1
+                    }
+                ]
+            }
+        ],
+        "measurement_unit": "kg"
+    }
+}
