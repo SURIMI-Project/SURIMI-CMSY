@@ -5,10 +5,11 @@ from concurrent import futures
 from server.exception_metadata_interceptor import ExceptionMetadataInterceptor
 from server.version_metadata_interceptor import VersionMetadataInterceptor
 from server.StockAssessment import StockAssessmentService
-from surimi.v1 import stock_assessment_service_pb2_grpc
+from surimi.v1 import stock_assessment_service_pb2_grpc, stock_assessment_service_pb2
 from vault_service import VaultService
 from dotenv import load_dotenv
 from importlib.metadata import version, PackageNotFoundError
+from grpc_reflection.v1alpha import reflection
 
 def _build_server():
     """Initialise and start the gRPC server, return the server instance."""
@@ -45,6 +46,13 @@ def _build_server():
 
     stock_assessment_service = StockAssessmentService(experiment_dictionary, ver)
     stock_assessment_service_pb2_grpc.add_StockAssessmentServiceServicer_to_server(stock_assessment_service, server)
+
+    # the reflection service will be aware of "StockAssessmentService" and "ServerReflection" services.
+    SERVICE_NAMES = (
+        stock_assessment_service_pb2.DESCRIPTOR.services_by_name['StockAssessmentService'].full_name,
+        reflection.SERVICE_NAME,
+    )
+    reflection.enable_server_reflection(SERVICE_NAMES, server)
 
     # Bind the server to a port
     server.add_insecure_port("[::]:5021")
