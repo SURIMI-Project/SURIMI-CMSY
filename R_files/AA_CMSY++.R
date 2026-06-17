@@ -62,16 +62,16 @@ n.chains     <- 1 # FAST: 1 chain per stock — parallelism happens at stock lev
 catch_file  <- "catch_file.csv" #"Stocks_Catch_2020CMSYrun2_v5_RS - Copy.csv"  #"CombStocks_Catch_2020CMSYrun3_v4.csv"  # "SAUP_Catch_1.csv"  #"SimCatchCPUE_4.csv"  # "Stocks_Catch_Aust_2.csv" #"STECF_Catch_2020_2.csv" #"tRFMO_Catch_2020.csv" #"ICES_Catch_2020.csv" #"Global_Stocks_Catch.csv" #"SimCatchCPUE_4.csv" #"Stocks_Catch_Test.csv"  #"Stock_Catch_forRainer.csv" # "SimCatchCPUE_3.csv" #  name of file containing "Stock", "yr", "ct", and optional "bt"
 id_file     <- "id_file.csv" #"Stocks_ID_forDeng_RSb - Copy.csv" # "CombStocks_ID_2020CMSYrun3_v3_RF3.csv"   #    "SAUP_ID_2.csv"    #"SimSpecCPUE_4_NA_int_end.csv"  #"Train_ID_7j.csv" # "Stocks_ID_Aust_4.csv"  #"STECF_ID_2020_2.csv" #tRFMO_ID_2020_2.csv" #"ICES_ID_2020_4.csv" #"Robust_Stocks_ID_10_allNA.csv" #"SimSpecCPUE_4.csv"#"Stocks_ID_R_7.csv"  #"Stock_ID_forRainer.csv"  #  "NCod_ID_4.csv" #"SimSpecCPUE_3.csv" #  name of file containing stock-specific info and settings for the analysis
 nn_file     <-  "ffnn.bin" # file containing neural networks trained to estimate B/k priors
-outfile <- "West_Med_id_file_output.csv" # default name for output file
+outfile <- "CMSY_output.csv" # default name for output file
 
 
 #----------------------------------------
 # Select stock to be analyzed ----
 #----------------------------------------
-stocks      <- NA
+ stocks      <- NA
 # If the input files contain more than one stock, specify below the stock to be analyzed
 # If the line below is commented out (#), all stocks in the input file will be analyzed
-# stocks <- "HKE"
+# stocks <- "UMO"
 #-----------------------------------------
 # General settings for the analysis ----
 #-----------------------------------------
@@ -613,6 +613,9 @@ if (btype == "biomass" | btype == "CPUE") {
       break}
     if(length(yr)==0){
       cat("ERROR: Could not find the stock in the Catch input files - Please check that the code is written correctly")
+      return (NA) }
+    if(length(yr) < 10){
+      cat("WARNING: Skipping stock ",stock," - only ",length(yr)," year(s) of catch data; CMSY++ requires at least 10 consecutive years to run.\n",sep="")
       return (NA) }
     if(btype %in% c("None","CPUE","biomass")==FALSE){
       cat("ERROR: In ID file, btype must be None, CPUE, or biomass.")
@@ -2327,7 +2330,8 @@ if (kobe.plot == TRUE) {
                         bt.out[61],bt.out[62],bt.out[63],bt.out[64],bt.out[65],bt.out[66],bt.out[67],bt.out[68],bt.out[69],bt.out[70],  # 2010-2019
                         bt.out[71],bt.out[72],bt.out[73],bt.out[74],bt.out[75],bt.out[76],bt.out[77],bt.out[78],bt.out[79],bt.out[80],bt.out[81]) # 2020-2030
 
-    # FAST: return row instead of writing — collected and written once after mclapply
+    # FAST: write this stock's row to outfile immediately on success (not collected for a later batch write)
+    write.table(output, file=outfile, append=TRUE, sep=",", dec=".", row.names=FALSE, col.names=FALSE)
     cat(sprintf("  [TIMING] %s — total stock time: %.1f sec\n", stock, as.numeric(Sys.time() - t_stock_start, units="secs"))) # FAST: timing
     file.remove(model_file) # clean up per-stock JAGS model file
     return(output)
@@ -2545,20 +2549,7 @@ if (kobe.plot == TRUE) {
 	  if(close.plots==T) graphics.off() # close on-screen graphics windows after files are saved
 	} #retrospective analysis plots - end
 
-}) # FAST: end of mclapply — stock_outputs is a list of output data frames
+}) # FAST: end of mclapply — stock_outputs is a list of output data frames (each stock's row was already written to outfile as it completed)
 
-# FAST: write all stock results to the output file in one pass
-if(write.output == T) {
-  for(res in stock_outputs) {
-    if(!is.null(res) && !inherits(res, "try-error")) {
-      write.table(res, file=outfile, append=T, sep=",",
-                  dec=".", row.names=FALSE, col.names=FALSE)
-    }
-  }
-  cat("Results written to", outfile, "\n")
-}
-
-cat(sprintf("\n[TIMING] Total script time: %.1f sec\n", as.numeric(Sys.time() - t_script_start, units="secs"))) # FAST: timing — script end
-
-
-
+cat(sprintf("[TIMING] Total script time: %.1f sec\n", as.numeric(Sys.time() - t_script_start, units="secs")))
+cat("[OK] All stock results written to", outfile, "\n")

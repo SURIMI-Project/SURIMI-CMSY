@@ -455,32 +455,122 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
 
         print(f"GetStockAssessment for experiment {request.experiment_id}")
 
-        # TODO: read the output csv file (West_Med_id_file_output.csv) and build a real response
-        # Hardcoded dummy response for PIL, ANK, BOG
-        summary = stock_assessment_pb2.StockAssessmentSummary(
-            species_stock_assessments=[
-                stock_assessment_pb2.SpeciesStockAssessment(
-                    species=species_pb2.Species(species_code="PIL"),
-                    stock_assessments=[
-                        stock_assessment_pb2.StockAssessment(year=2013, exploitation=0.5, stock_status=0.8),
-                        stock_assessment_pb2.StockAssessment(year=2014, exploitation=0.6, stock_status=0.7)
-                    ]
-                ),
-                stock_assessment_pb2.SpeciesStockAssessment(
-                    species=species_pb2.Species(species_code="ANK"),
-                    stock_assessments=[
-                        stock_assessment_pb2.StockAssessment(year=2013, exploitation=0.4, stock_status=0.75),
-                        stock_assessment_pb2.StockAssessment(year=2014, exploitation=0.45, stock_status=0.72)
-                    ]
-                ),
-                stock_assessment_pb2.SpeciesStockAssessment(
-                    species=species_pb2.Species(species_code="BOG"),
-                    stock_assessments=[
-                        stock_assessment_pb2.StockAssessment(year=2013, exploitation=0.6, stock_status=0.65),
-                        stock_assessment_pb2.StockAssessment(year=2014, exploitation=0.65, stock_status=0.6)
-                    ]
-                ),
+        # TODO: read the output csv file (CMSY_output.csv) and build a real response
+        # Hardcoded dummy response for PIL, ANK, BOG — kept for reference
+        # summary = stock_assessment_pb2.StockAssessmentSummary(
+        #     species_stock_assessments=[
+        #         stock_assessment_pb2.SpeciesStockAssessment(
+        #             species=species_pb2.Species(species_code="PIL"),
+        #             stock_assessments=[
+        #                 stock_assessment_pb2.StockAssessment(year=2013, exploitation=0.5, stock_status=0.8),
+        #                 stock_assessment_pb2.StockAssessment(year=2014, exploitation=0.6, stock_status=0.7)
+        #             ]
+        #         ),
+        #         stock_assessment_pb2.SpeciesStockAssessment(
+        #             species=species_pb2.Species(species_code="ANK"),
+        #             stock_assessments=[
+        #                 stock_assessment_pb2.StockAssessment(year=2013, exploitation=0.4, stock_status=0.75),
+        #                 stock_assessment_pb2.StockAssessment(year=2014, exploitation=0.45, stock_status=0.72)
+        #             ]
+        #         ),
+        #         stock_assessment_pb2.SpeciesStockAssessment(
+        #             species=species_pb2.Species(species_code="BOG"),
+        #             stock_assessments=[
+        #                 stock_assessment_pb2.StockAssessment(year=2013, exploitation=0.6, stock_status=0.65),
+        #                 stock_assessment_pb2.StockAssessment(year=2014, exploitation=0.65, stock_status=0.6)
+        #             ]
+        #         ),
+        #     ]
+        # )
+
+        import csv as csv_module
+
+        experiment_dir = Path(__file__).parent.parent / "experiments" / request.experiment_id
+        historical_file = experiment_dir / "CMSY_output_historical.csv"
+        simulation_file = experiment_dir / "CMSY_output.csv"
+
+        if not simulation_file.exists():
+            print(f"[WARNING] Simulation output not found for experiment {request.experiment_id}. "
+                  f"Returning historical assessment only. Call FinaliseExperiment to generate simulation results.")
+
+        def decode_year(suffix):
+            n = int(suffix)
+            return 1900 + n if n >= 50 else 2000 + n
+
+        def read_output_file(filepath):
+            result = {}
+            if not filepath.exists():
+                return result
+            try:
+                with open(filepath, newline='', encoding='utf-8-sig') as f:
+                    for row in csv_module.DictReader(f):
+                        stock = (row.get("Stock") or "").strip()
+                        if stock:
+                            result[stock] = row
+            except Exception as e:
+                print(f"[WARNING] Could not read {filepath}: {e}")
+            return result
+
+        def extract_yearly_data(row):
+            bmsy_str = (row.get("Bmsy") or "").strip()
+            if not bmsy_str or bmsy_str == "NA":
+                return {}
+            try:
+                bmsy = float(bmsy_str)
+            except ValueError:
+                return {}
+            yearly = {}
+            for col, val in row.items():
+                if col.startswith("F.Fmsy") and not col.startswith("F.Fmsy_"):
+                    suffix = col[len("F.Fmsy"):]
+                    if not suffix.isdigit() or len(suffix) != 2:
+                        continue
+                    if val is None or val.strip() in ("", "NA"):
+                        continue
+                    b_col = f"B{suffix}"
+                    b_val = (row.get(b_col) or "").strip()
+                    if not b_val or b_val == "NA":
+                        continue
+                    try:
+                        year = decode_year(suffix)
+                        exploitation = float(val.strip())
+                        stock_status = float(b_val) / bmsy
+                        yearly[year] = (exploitation, stock_status)
+                    except ValueError:
+                        continue
+            return yearly
+
+        historical_rows = read_output_file(historical_file)
+        simulation_rows = read_output_file(simulation_file)
+        all_stocks = set(list(historical_rows.keys()) + list(simulation_rows.keys()))
+
+        species_assessments = []
+        for stock_code in sorted(all_stocks):
+            yearly_data = {}
+            if stock_code in historical_rows:
+                yearly_data.update(extract_yearly_data(historical_rows[stock_code]))
+            if stock_code in simulation_rows:
+                yearly_data.update(extract_yearly_data(simulation_rows[stock_code]))
+            if not yearly_data:
+                continue
+            stock_assessments = [
+                stock_assessment_pb2.StockAssessment(
+                    year=year,
+                    exploitation=exploitation,
+                    stock_status=stock_status
+                )
+                for year, (exploitation, stock_status) in sorted(yearly_data.items())
             ]
+            species_assessments.append(
+                stock_assessment_pb2.SpeciesStockAssessment(
+                    species=species_pb2.Species(species_code=stock_code),
+                    stock_assessments=stock_assessments
+                )
+            )
+            print(f"[OK] GetStockAssessment: {stock_code} — {len(stock_assessments)} yearly entries")
+
+        summary = stock_assessment_pb2.StockAssessmentSummary(
+            species_stock_assessments=species_assessments
         )
 
         return get_stock_assessment_pb2.GetStockAssessmentResponse(
@@ -593,7 +683,7 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
             return
 
         # === FIND THE HISTORICAL OUTPUT CSV PRODUCED BY THE FIRST ASSESSMENT ===
-        candidate_files = sorted(experiment_dir.glob("*id_file_output_historical.csv"))
+        candidate_files = sorted(experiment_dir.glob("CMSY_output_historical.csv"))
 
         if not candidate_files:
             print(f"[WARNING] No historical id_file output found in {experiment_dir}")
