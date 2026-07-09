@@ -1,4 +1,5 @@
 import os
+import logging
 import hvac
 
 
@@ -12,7 +13,7 @@ class VaultService:
         vault_mount = os.environ.get("VAULT_MOUNT")
         
         if not vault_addr or not vault_token or not vault_top_dir or not vault_relative_path or not vault_mount:
-            print("Vault Addr, Token, Top Dir, Relative Path, or Mount not set in environment variables. Skipping Vault loading.")
+            logging.info("Vault Addr, Token, Top Dir, Relative Path, or Mount not set in environment variables. Skipping Vault loading.")
             return
         
         vault_client = hvac.Client(url=vault_addr, token=vault_token)
@@ -23,5 +24,5 @@ class VaultService:
         
         for key, value in secret['data']['data'].items():
             os.environ[key] = str(value)
-            print(f"Loaded secret '{key}' from Vault into environment variables.")
+            logging.info(f"Loaded secret '{key}' from Vault into environment variables.")
 
