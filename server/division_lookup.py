@@ -1,6 +1,7 @@
 import geopandas as gpd
 from shapely.geometry import Point
 from pathlib import Path
+import logging
 
 # Load the FAO shapefile once when the module is imported
 try:
@@ -9,9 +10,9 @@ try:
 
 
     fao_gdf = gpd.read_file(shapefile_path).to_crs(epsg=4326)
-    print(f"[INFO] FAO shapefile loaded with {len(fao_gdf)} records.")
+    logging.info(f"FAO shapefile loaded with {len(fao_gdf)} records.")
 except Exception as e:
-    print(f"[ERROR] Could not load FAO shapefile: {e}")
+    logging.error(f"Could not load FAO shapefile: {e}")
     fao_gdf = None  # Prevent crash; fail gracefully
 
 
@@ -31,7 +32,7 @@ def get_division(latitude: float, longitude: float) -> str:
             return match.iloc[0].get("F_NAME", "Unknown Division")
 
     except Exception as e:
-        print(f"[ERROR] get_division failed for ({latitude}, {longitude}): {e}")
+        logging.error(f"get_division failed for ({latitude}, {longitude}): {e}")
 
     return "Unknown Division"
 
@@ -42,7 +43,7 @@ if __name__ == "__main__":
         (35.805, -2.095)
     ]
 
-    print("[TEST] Running FAO division lookup test...\n")
+    logging.info("[TEST] Running FAO division lookup test...\n")
     for lat, lon in test_points:
         result = get_division(lat, lon)
-        print(f"Coordinates ({lat}, {lon}) -> Division: {result}")
+        logging.info(f"Coordinates ({lat}, {lon}) -> Division: {result}")

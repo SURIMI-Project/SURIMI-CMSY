@@ -1,3 +1,11 @@
+import logging
+from server.logging_formatter import _ConditionalLoggingLevelFormatter
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(_ConditionalLoggingLevelFormatter())
+logging.root.addHandler(_handler)
+logging.root.setLevel(logging.DEBUG)
+
 import os
 import grpc
 
@@ -21,17 +29,17 @@ def _build_server():
     VaultService.LoadVaultSecretsInEnvironmentVariables()  # Load secrets from Vault into environment variables
 
     # Print all environment variables
-    print("=" * 80)
-    print("Environment Variables:")
-    print("=" * 80)
+    logging.info("=" * 80)
+    logging.info("Environment Variables:")
+    logging.info("=" * 80)
     for key, value in sorted(os.environ.items()):
-        print(f"{key}: {value}")
-    print("=" * 80)
+        logging.info(f"{key}: {value}")
+    logging.info("=" * 80)
 
     ver = load_version("surimi_surimi_protocol_grpc_python")
-    print("Starting gRPC Server... with protocol version:", ver)
+    logging.info(f"Starting gRPC Server... with protocol version: {ver}")
 
-    print("Starting gRPC Server...")
+    logging.info("Starting gRPC Server...")
 
     # Create the server with 100MB message size limit
     max_message_length = 100 * 1024 * 1024  # 100MB
@@ -57,7 +65,7 @@ def _build_server():
     # Bind the server to a port
     server.add_insecure_port("[::]:5021")
     server.start()
-    print("[OK] gRPC Server running on port 5021")
+    logging.info("[OK] gRPC Server running on port 5021")
     return server
 
 
@@ -67,7 +75,7 @@ def serve():
     try:
         server.wait_for_termination()
     except KeyboardInterrupt:
-        print("\n[INFO] Server shutting down...")
+        logging.info("\n[INFO] Server shutting down...")
 
 
 def serve_in_thread():
