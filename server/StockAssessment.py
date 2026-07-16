@@ -40,8 +40,6 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
             f"with start date {request.simulation.start_date_time} and step size {request.simulation.time_step}"
         )
 
-        S3_Storage.DownloadFilesFromS3("surimi-cmsy/config", "R_files")
-
         output_directory = Path(__file__).parent.parent.resolve() / Path("experiments") / request.experiment_id
         try:
             output_directory.mkdir(parents=True, exist_ok=True)
@@ -51,13 +49,45 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
         except Exception as e:
             log_and_abort(context, grpc.StatusCode.INTERNAL, f"Directory creation failed: {str(e)}")
 
-        src_dir = Path(__file__).parent.parent.resolve() / Path("R_files")
-        logging.info(f"Copying files from {src_dir} to {output_directory}")
-        shutil.copy(src_dir / "catch_file.csv", output_directory / "catch_file.csv")
-        shutil.copy(src_dir / "catch_file_original.csv", output_directory / "catch_file_original.csv")
-        shutil.copy(src_dir / "id_file.csv", output_directory / "id_file.csv")
-        shutil.copy(src_dir / "AA_CMSY++.R", output_directory / "AA_CMSY++.R")
-        shutil.copy(src_dir / "ffnn.bin", output_directory / "ffnn.bin")
+        allowed_scenarios = {"aegean_sea", "northwestern_med", "anchovy_bay"}
+        scenario_name = request.scenario_name.strip()
+        if scenario_name not in allowed_scenarios:
+            log_and_abort(
+                context,
+                grpc.StatusCode.INVALID_ARGUMENT,
+                f"Invalid scenario_name '{request.scenario_name}'. "
+                f"Allowed values are: {', '.join(sorted(allowed_scenarios))}"
+            )
+
+        s3_scenario_path = f"cmsy/{scenario_name}"
+        logging.info(f"Downloading scenario files from S3: {s3_scenario_path} to {output_directory}")
+        S3_Storage.DownloadFilesFromS3(
+            s3_scenario_path,
+            str(output_directory)
+        )
+
+        required_files = [
+            "AA_CMSY++.R",
+            "catch_file.csv",
+            "catch_file_original.csv",
+            "id_file.csv",
+            "id_file_original.csv",
+            "ffnn.bin",
+            "r2jags.bug",
+        ]
+        missing_files = [
+            filename
+            for filename in required_files
+            if not (output_directory / filename).exists()
+        ]
+        if missing_files:
+            log_and_abort(
+                context,
+                grpc.StatusCode.INTERNAL,
+                f"S3 download incomplete for scenario '{scenario_name}'. "
+                f"Missing files: {', '.join(missing_files)}"
+            )
+        logging.info(f"[OK] All required scenario files present in {output_directory}")
 
         # =============================
         # CONTRACT SPECIES FILTERING (RUN ONLY CONTRACT SPECIES; THROW EVERYTHING ELSE)

@@ -868,7 +868,7 @@ if (btype == "biomass" | btype == "CPUE") {
     # The following assumes that max smoothed cpue will not exceed carrying capacity and will
     # not be less than a quarter of carrying capacity
 
-    if(btype != "None") {
+    if(btype != "None" & sum(bt > 0, na.rm=T) > 0) {
       # get length, min, max, min/max ratio of smoothed bt data
       start.bt      <- yr[which(bt>0)[1]]
       end.bt        <- yr[max(which(bt>0))]
@@ -1451,9 +1451,13 @@ if(substr(id_file,1,3)=="Sim") lines(x=yr, y=rep(true.MSY, length(yr)), lty="das
   # (e) Exploitation rate plot ----
   # -------------------------
   # if CPUE data are available but fewer than nab years, plot on second axis
-  if(btype == "CPUE" | btype=="biomass") {
+  if((btype == "CPUE" | btype=="biomass") & FullSchaefer==T) {
     q=1/(max(bk.cmsy[1:nyr][is.na(bt)==F],na.rm=T)*k.cmsy/max(bt,na.rm=T))
     u.cpue      <- q.bsm*ct/bt
+  } else if(btype == "CPUE" | btype=="biomass") {
+    cat("WARNING: btype is set to '", btype, "' for stock ", stock,
+        " but no valid abundance data were found in the catch file.",
+        " BSM was not run. Assessment continues in catch-only CMSY++ mode.\n", sep="")
   }
   # determine upper bound of Y-axis
   max.y <- max(c(1.5,ucl.FFmsy.cmsy,ifelse(FullSchaefer==T,max(c(ucl.FFmsy.bsm),na.rm=T),NA),na.rm=T),na.rm=T)
