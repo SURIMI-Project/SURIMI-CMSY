@@ -81,10 +81,27 @@ class StockAssessmentService(stock_assessment_service_pb2_grpc.StockAssessmentSe
             if not (output_directory / filename).exists()
         ]
         if missing_files:
+            logging.info(f"[INFO] S3 unavailable or incomplete. Falling back to local R_files/{scenario_name}/")
+            local_scenario_dir = Path(__file__).parent.parent.resolve() / "R_files" / scenario_name
+            for filename in missing_files:
+                src = local_scenario_dir / filename
+                if src.exists():
+                    shutil.copy2(src, output_directory / filename)
+                    logging.info(f"[OK] Copied local fallback file: {src} -> {output_directory / filename}")
+                else:
+                    logging.warning(f"[WARNING] Local fallback file not found: {src}")
+
+            missing_files = [
+                filename
+                for filename in required_files
+                if not (output_directory / filename).exists()
+            ]
+
+        if missing_files:
             log_and_abort(
                 context,
                 grpc.StatusCode.INTERNAL,
-                f"S3 download incomplete for scenario '{scenario_name}'. "
+                f"Scenario '{scenario_name}' files not available from S3 or local fallback. "
                 f"Missing files: {', '.join(missing_files)}"
             )
         logging.info(f"[OK] All required scenario files present in {output_directory}")
