@@ -71,7 +71,7 @@ outfile <- "CMSY_output.csv" # default name for output file
  stocks      <- NA
 # If the input files contain more than one stock, specify below the stock to be analyzed
 # If the line below is commented out (#), all stocks in the input file will be analyzed
-# stocks <- "UMO"
+# stocks <- "OCM"
 #-----------------------------------------
 # General settings for the analysis ----
 #-----------------------------------------
