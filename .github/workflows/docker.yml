@@ -22,8 +22,8 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -f Dockerfile . -t ghcr.io/official-ewe/surimicmsy:latest
+          docker build -f Dockerfile . -t ghcr.io/surimi-project/surimicmsy:latest
 
       - name: Push Docker image
         run: |
-          docker push ghcr.io/official-ewe/surimicmsy:latest
+          docker push ghcr.io/surimi-project/surimicmsy:latest
