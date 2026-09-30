@@ -25,7 +25,7 @@ This workspace produces no compiled native binaries. The single deployable artef
 
 | Artefact | Built by | Description |
 |---|---|---|
-| `ghcr.io/official-ewe/surimicmsy:latest` | `docker build -f Dockerfile .` | Runtime container image. Packages the Python gRPC service, R, JAGS, all required R packages, and Python dependencies into a `python:3.12-slim`-based image. Exposes the service on port `5021` and starts it via `python -u server/app.py`. |
+| `ghcr.io/SURIMI-Project/surimicmsy:latest` | `docker build -f Dockerfile .` | Runtime container image. Packages the Python gRPC service, R, JAGS, all required R packages, and Python dependencies into a `python:3.12-slim`-based image. Exposes the service on port `5021` and starts it via `python -u server/app.py`. |
 
 One pre-built binary asset is consumed (not produced) by this workspace:
 
@@ -199,7 +199,7 @@ Operational deployment concerns (scaling, service routing, secret injection, and
   1. Checkout repository.
   2. Login to GitHub Container Registry (GHCR) using `${{ secrets.GITHUB_TOKEN }}`.
   3. Build Docker image from root `Dockerfile`.
-  4. Push image to `ghcr.io/official-ewe/surimicmsy:latest`.
+  4. Push image to `ghcr.io/SURIMI-Project/surimicmsy:latest`.
 - Docker image characteristics:
   - Base: `python:3.12-slim`.
   - Installs R, JAGS (`apt` package), and R dependencies required by CMSY++.
@@ -237,7 +237,7 @@ Operational deployment concerns (scaling, service routing, secret injection, and
 - `README.md`: repository-level usage and context notes.
 
 ## Source control
-The repository uses **Git**, hosted on **GitHub** at `https://github.com/Official-EwE/SURIMI-CMSY`.
+The repository uses **Git**, hosted on **GitHub** at `https://github.com/SURIMI-Project/SURIMI-CMSY`.
 
 - The default integration branch is `main`; CI builds and pushes the Docker image on every push to `main`.
 - There are no Git submodules. The gRPC protocol definition (`.proto` files and generated stubs) lives in a sibling repository (`SURIMI-protocol`) and is consumed as a versioned pip package (`surimi-surimi-protocol-grpc-python`) pinned in `requirements.txt`, not as a submodule.
